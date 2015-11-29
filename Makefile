@@ -1,6 +1,6 @@
-CC=gcc
+CC=icc
 
-CFLAGS=-Ofast -g -Wall 
+CFLAGS=-Ofast 
 
 EXE=lbm
 

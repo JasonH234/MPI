@@ -71,8 +71,8 @@ int main(int argc, char* argv[])
     accel_area_t accel_area;
 
     param_t  params;              /* struct to hold parameter values */
-    speed_t* cells     = NULL;    /* grid containing fluid densities */
-    speed_t* tmp_cells = NULL;    /* scratch space */
+    speed_t* cells_even     = NULL;    /* grid containing fluid densities */
+    speed_t* cells_odd = NULL;    /* scratch space */
     int*     obstacles = NULL;    /* grid indicating which cells are blocked */
     float*  av_vels   = NULL;    /* a record of the av. velocity computed for each timestep */
 
@@ -85,7 +85,7 @@ int main(int argc, char* argv[])
 
     parse_args(argc, argv, &final_state_file, &av_vels_file, &param_file);
 
-    initialise(param_file, &accel_area, &params, &cells, &tmp_cells, &obstacles, &av_vels);
+    initialise(param_file, &accel_area, &params, &cells_even, &cells_odd, &obstacles, &av_vels);
 
     /* iterate for max_iters timesteps */
     gettimeofday(&timstr,NULL);
@@ -94,18 +94,18 @@ int main(int argc, char* argv[])
     for (ii = 0; ii < params.max_iters; ii++)
     {
 	if(ii % 2 == 0) {
-	  timestep(params, accel_area, cells, tmp_cells, obstacles);
-	  av_vels[ii] = simulation_steps(params, cells, tmp_cells, obstacles);
+	  accelerate_flow(params, accel_area, cells_even, obstacles);
+	  av_vels[ii] = simulation_steps(params, cells_odd, cells_even, obstacles);
 	}
 	else {
-	    timestep(params, accel_area, tmp_cells, cells, obstacles);
-	    av_vels[ii] = simulation_steps(params, tmp_cells, cells, obstacles);  
+	  accelerate_flow(params, accel_area, cells_odd, obstacles);
+	  av_vels[ii] = simulation_steps(params, cells_even, cells_odd, obstacles);  
 	}
 
         #ifdef DEBUG
         printf("==timestep: %d==\n", ii);
         printf("av velocity: %.12E\n", av_vels[ii]);
-        printf("tot density: %.12E\n", total_density(params, cells));
+        printf("tot density: %.12E\n", total_density(params, cells_even));
         #endif
     }
 
@@ -118,13 +118,13 @@ int main(int argc, char* argv[])
     systim=timstr.tv_sec+(timstr.tv_usec/1000000.0);
 
     printf("==done==\n");
-    printf("Reynolds number:\t\t%.12E\n", calc_reynolds(params,cells,obstacles));
+    printf("Reynolds number:\t\t%.12E\n", calc_reynolds(params,av_vels[ii-1]));
     printf("Elapsed time:\t\t\t%.6f (s)\n", toc-tic);
     printf("Elapsed user CPU time:\t\t%.6f (s)\n", usrtim);
     printf("Elapsed system CPU time:\t%.6f (s)\n", systim);
 
-    write_values(final_state_file, av_vels_file, params, cells, obstacles, av_vels);
-    finalise(&cells, &tmp_cells, &obstacles, &av_vels);
+    write_values(final_state_file, av_vels_file, params, cells_even, obstacles, av_vels);
+    finalise(&cells_even, &cells_odd, &obstacles, &av_vels);
 
     return EXIT_SUCCESS;
 }
@@ -215,11 +215,11 @@ void write_values(const char * final_state_file, const char * av_vels_file,
     fclose(fp);
 }
 
-float calc_reynolds(const param_t params, speed_t* cells, int* obstacles)
+float calc_reynolds(const param_t params, const float av_vel)
 {
     const float viscosity = 1.0 / 6.0 * (2.0 / params.omega - 1.0);
 
-    return av_velocity(params,cells,obstacles) * params.reynolds_dim / viscosity;
+    return av_vel * params.reynolds_dim / viscosity;
 }
 
 float total_density(const param_t params, speed_t* cells)

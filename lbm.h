@@ -59,7 +59,7 @@ void propagate(const param_t params, speed_t* cells, speed_t* tmp_cells);
 void rebound(const param_t params, speed_t* cells, speed_t* tmp_cells, int* obstacles);
 void collision(const param_t params, speed_t* cells, speed_t* tmp_cells, int* obstacles);
 void copy_cells(const param_t params, speed_t* cells1, speed_t* cells2);
-float simulation_steps(const param_t params, speed_t* cells, speed_t* tmp_cells, int* obstacles);
+float simulation_steps(const param_t params, speed_t* cells, const speed_t* old_cells, int* obstacles);
 /* Sum all the densities in the grid.
 ** The total should remain constant from one timestep to the next. */
 float total_density(const param_t params, speed_t* cells);
@@ -68,7 +68,7 @@ float total_density(const param_t params, speed_t* cells);
 float av_velocity(const param_t params, speed_t* cells, int* obstacles);
 
 /* calculate Reynolds number */
-float calc_reynolds(const param_t params, speed_t* cells, int* obstacles);
+float calc_reynolds(const param_t params, const float av_vel);
 
 /* Exit, printing out formatted string */
 #define DIE(...) exit_with_error(__LINE__, __FILE__, __VA_ARGS__)
