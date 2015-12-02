@@ -72,9 +72,6 @@ float simulation_steps(const param_t params, speed_t* cells, const speed_t* old_
     const float w1 = 1.0/9.0;    /* weighting factor */
     const float w2 = 1.0/36.0;   /* weighting factor */
 
-    float u_x,u_y;               /* av. velocities in x and y directions */
-    float u_sq;                  /* squared velocity */
-    float local_density;         /* sum of densities in a particular cell */
     float u[NSPEEDS];            /* directional velocities */
     float d_equ[NSPEEDS];        /* equilibrium densities */
     int    tot_cells = 0;  /* no. of cells used in calculation */
@@ -116,14 +113,8 @@ float simulation_steps(const param_t params, speed_t* cells, const speed_t* old_
 	      } 
 	    else
 	      {
-		local_density = 0.0;
-
-                for (kk = 0; kk < NSPEEDS; kk++)
-                {
-                    local_density += tmp[kk];
-                }
-
-                u_x = (tmp[1] +
+		const float local_density = tmp[0] + tmp[1] + tmp[2] + tmp[3] + tmp[4] + tmp[5] + tmp[6] + tmp[7] + tmp[8];
+                const float u_x = (tmp[1] +
                         tmp[5] +
                         tmp[8]
                     - (tmp[3] +
@@ -131,7 +122,7 @@ float simulation_steps(const param_t params, speed_t* cells, const speed_t* old_
                         tmp[7]))
                     / local_density;
 
-                u_y = (tmp[2] +
+                const float u_y = (tmp[2] +
                         tmp[5] +
                         tmp[6]
                     - (tmp[4] +
@@ -139,42 +130,20 @@ float simulation_steps(const param_t params, speed_t* cells, const speed_t* old_
                         tmp[8]))
                     / local_density;
 
-                u_sq = u_x * u_x + u_y * u_y;
+                const float u_sq = u_x * u_x + u_y * u_y;
+		const float c1 = local_density / 9.0;
+		const float c2 = local_density / 36.0;
 
-                u[1] =   u_x; 
-                u[2] =         u_y;
-                u[3] = - u_x;      
-                u[4] =       - u_y;
-                u[5] =   u_x + u_y;
-                u[6] = - u_x + u_y;
-                u[7] = - u_x - u_y;
-                u[8] =   u_x - u_y;
 
                 d_equ[0] = w0 * local_density * (1.0 - u_sq / (2.0 * c_sq));
-                d_equ[1] = w1 * local_density * (1.0 + u[1] / c_sq
-                    + (u[1] * u[1]) / (2.0 * c_sq * c_sq)
-                    - u_sq / (2.0 * c_sq));
-                d_equ[2] = w1 * local_density * (1.0 + u[2] / c_sq
-                    + (u[2] * u[2]) / (2.0 * c_sq * c_sq)
-                    - u_sq / (2.0 * c_sq));
-                d_equ[3] = w1 * local_density * (1.0 + u[3] / c_sq
-                    + (u[3] * u[3]) / (2.0 * c_sq * c_sq)
-                    - u_sq / (2.0 * c_sq));
-                d_equ[4] = w1 * local_density * (1.0 + u[4] / c_sq
-                    + (u[4] * u[4]) / (2.0 * c_sq * c_sq)
-                    - u_sq / (2.0 * c_sq));
-                d_equ[5] = w2 * local_density * (1.0 + u[5] / c_sq
-                    + (u[5] * u[5]) / (2.0 * c_sq * c_sq)
-                    - u_sq / (2.0 * c_sq));
-                d_equ[6] = w2 * local_density * (1.0 + u[6] / c_sq
-                    + (u[6] * u[6]) / (2.0 * c_sq * c_sq)
-                    - u_sq / (2.0 * c_sq));
-                d_equ[7] = w2 * local_density * (1.0 + u[7] / c_sq
-                    + (u[7] * u[7]) / (2.0 * c_sq * c_sq)
-                    - u_sq / (2.0 * c_sq));
-                d_equ[8] = w2 * local_density * (1.0 + u[8] / c_sq
-                    + (u[8] * u[8]) / (2.0 * c_sq * c_sq)
-                    - u_sq / (2.0 * c_sq));
+                d_equ[1] = c1 * (1.0 + (3.0)*u_x + (u_x * u_x)*(4.5) -u_sq*(1.5));
+                d_equ[2] = c1 * (1.0 + (3.0)*u_y + (u_y * u_y)*(4.5) -u_sq*(1.5));
+                d_equ[3] = c1 * (1.0 - (3.0)*(u_x) + (u_x * u_x)*(4.5) -u_sq*(1.5)); 
+                d_equ[4] = c1 * (1.0 - (3.0)*u_y + (u_y * u_y)*(4.5) -u_sq*(1.5));
+                d_equ[5] = c2 * (1.0 + (3.0)*(u_x+u_y) + ((u_x+u_y) * (u_x+u_y))*(4.5) -u_sq*(1.5));
+                d_equ[6] = c2 * (1.0 + (3.0)*(-u_x+u_y) + ((-u_x+u_y) * (-u_x+u_y))*(4.5) -u_sq*(1.5));
+                d_equ[7] = c2 * (1.0 + (3.0)*(-u_x-u_y) + ((-u_x-u_y) * (-u_x-u_y))*(4.5) -u_sq*(1.5));
+                d_equ[8] = c2 * (1.0 + (3.0)*(u_x-u_y) + ((u_x-u_y)*(u_x-u_y))*(4.5) -u_sq*(1.5));
 
                 for (kk = 0; kk < NSPEEDS; kk++)
                 {
