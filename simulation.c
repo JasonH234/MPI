@@ -1,5 +1,4 @@
 /* Functions pertinent to the outer simulation steps */
-
 #include <math.h>
 
 #include "lbm.h"
@@ -74,24 +73,34 @@ float simulation_steps(const param_t params, speed_t* cells, const speed_t* old_
     const float w2 = params.omega / 36.0;
     const float omega_dif = 1.0-params.omega;
 
+    float local_density;
+    float u_sq;
+    float u_x;
+    float u_y;
+    float u_sum;
+    float u_dif;
+    float d;
+    float c1;
+    float c2;
+
     /* loop over _all_ cells */
 #pragma omp parallel for reduction(+:tot_cells,tot_u) shared(cells, old_cells, obstacles) private(ii, jj, kk, u_x, u_y, u_sq, local_density, u, d_equ) default(none) schedule(auto)
     for (ii = 0; ii < params.ny; ii++)
     {
         for (jj = 0; jj < params.nx; jj++)
         {
-	    float tmp[NSPEEDS];
+	  float tmp[NSPEEDS];
             int x_e,x_w,y_n,y_s;  /* indices of neighbouring cells */
             y_n = (ii + 1) % params.ny;
             x_e = (jj + 1) % params.nx;
             y_s = (ii == 0) ? (ii + params.ny - 1) : (ii - 1);
             x_w = (jj == 0) ? (jj + params.nx - 1) : (jj - 1);
 
-            tmp[0]  = old_cells[ii*params.nx + jj].speeds[0]; /* central cell, */                                                     /* no movement   */
+            tmp[0] = old_cells[ii*params.nx + jj].speeds[0]; /* central cell, */                                                     /* no movement   */
             tmp[1] = old_cells[ii*params.nx + x_w].speeds[1]; /* east */
-            tmp[2]  = old_cells[y_s*params.nx + jj].speeds[2]; /* north */
+            tmp[2] = old_cells[y_s*params.nx + jj].speeds[2]; /* north */
             tmp[3] = old_cells[ii*params.nx + x_e].speeds[3]; /* west */
-            tmp[4]  = old_cells[y_n*params.nx + jj].speeds[4]; /* south */
+            tmp[4] = old_cells[y_n*params.nx + jj].speeds[4]; /* south */
             tmp[5] = old_cells[y_s*params.nx + x_w].speeds[5]; /* north-east */
             tmp[6] = old_cells[y_s*params.nx + x_e].speeds[6]; /* north-west */
             tmp[7] = old_cells[y_n*params.nx + x_e].speeds[7]; /* south-west */
@@ -109,8 +118,8 @@ float simulation_steps(const param_t params, speed_t* cells, const speed_t* old_
 	      cells[ii*params.nx + jj].speeds[8] = tmp[6];
 	    }
 	    else {
-	      const float local_density = tmp[0] + tmp[1] + tmp[2] + tmp[3] + tmp[4] + tmp[5] + tmp[6] + tmp[7] + tmp[8];
-                const float u_x = (tmp[1] +
+	      local_density = tmp[0] + tmp[1] + tmp[2] + tmp[3] + tmp[4] + tmp[5] + tmp[6] + tmp[7] + tmp[8];
+              u_x = (tmp[1] +
                         tmp[5] +
                         tmp[8]
                     - (tmp[3] +
@@ -118,7 +127,7 @@ float simulation_steps(const param_t params, speed_t* cells, const speed_t* old_
                         tmp[7]))
                     / local_density;
 
-                const float u_y = (tmp[2] +
+               u_y = (tmp[2] +
                         tmp[5] +
                         tmp[6]
                     - (tmp[4] +
@@ -126,41 +135,26 @@ float simulation_steps(const param_t params, speed_t* cells, const speed_t* old_
                         tmp[8]))
                     / local_density;
 
-                const float u_sq = u_x * u_x + u_y * u_y;
-		const float c0 = w0 * local_density;
-		const float c1 = w1 * local_density;
-		const float c2 = w2 * local_density;
-		const float sum = u_x+u_y;
-		const float diff = u_x - u_y;
+                u_sq = u_x * u_x + u_y * u_y;
+		c1 = w1 * local_density;
+		c2 = w2 * local_density;
+		u_sum = u_x+u_y;
+		u_dif = u_x - u_y;
+		d = 1 - 1.5 * u_sq;
 
-	      cells[ii*params.nx + jj].speeds[0] = tmp[0]*omega_dif + c0 * (1 - u_sq*(1.5));
-	      cells[ii*params.nx + jj].speeds[1] = tmp[1]*omega_dif + c1 * (1.0 + (3.0)*u_x + (u_x * u_x)*(4.5) -u_sq*(1.5)); 
-	      cells[ii*params.nx + jj].speeds[2] = tmp[2]*omega_dif + c1 * (1.0 + (3.0)*u_y + (u_y * u_y)*(4.5) -u_sq*(1.5)); 
-	      cells[ii*params.nx + jj].speeds[3] = tmp[3]*omega_dif + c1 * (1.0 - (3.0)*(u_x) + (u_x * u_x)*(4.5) -u_sq*(1.5)); 
-	      cells[ii*params.nx + jj].speeds[4] = tmp[4]*omega_dif + c1 * (1.0 - (3.0)*u_y + (u_y * u_y)*(4.5) -u_sq*(1.5)); 
-	      cells[ii*params.nx + jj].speeds[5] = tmp[5]*omega_dif + c2 * (1.0 + (3.0)*(u_x+u_y) + ((u_x+u_y) * (u_x+u_y))*(4.5) -u_sq*(1.5)); 
-	      cells[ii*params.nx + jj].speeds[6] = tmp[6]*omega_dif + c2 * (1.0 + (3.0)*(-u_x+u_y) + ((-u_x+u_y) * (-u_x+u_y))*(4.5) -u_sq*(1.5));
-	      cells[ii*params.nx + jj].speeds[7] = tmp[7]*omega_dif + c2 * (1.0 + (3.0)*(-u_x-u_y) + ((-u_x-u_y) * (-u_x-u_y))*(4.5) -u_sq*(1.5)); 
-	      cells[ii*params.nx + jj].speeds[8] = tmp[8]*omega_dif + c2 * (1.0 + (3.0)*(u_x-u_y) + ((u_x-u_y)*(u_x-u_y))*(4.5) -u_sq*(1.5)); 
+	      cells[ii*params.nx + jj].speeds[0] = tmp[0]*omega_dif + w0*local_density*d;
+	      cells[ii*params.nx + jj].speeds[1] = tmp[1]*omega_dif + c1 * (d + 4.5*u_x*(2.0/3.0 + u_x));  
+	      cells[ii*params.nx + jj].speeds[2] = tmp[2]*omega_dif + c1 * (d + 4.5*u_y*(2.0/3.0 + u_y)); 
+	      cells[ii*params.nx + jj].speeds[3] = tmp[3]*omega_dif + c1 * (d - 4.5*u_x*(2.0/3.0-u_x)); 
+	      cells[ii*params.nx + jj].speeds[4] = tmp[4]*omega_dif + c1 * (d - 4.5*u_y*(2.0/3.0-u_y)); 
+	      cells[ii*params.nx + jj].speeds[5] = tmp[5]*omega_dif + c2 * (d + 4.5*u_sum*(2.0/3.0+u_sum)); 
+	      cells[ii*params.nx + jj].speeds[6] = tmp[6]*omega_dif + c2 * (d - 4.5*u_dif*(2.0/3.0-u_dif));
+	      cells[ii*params.nx + jj].speeds[7] = tmp[7]*omega_dif + c2 * (d - 4.5*u_sum*(2.0/3.0-u_sum)); 
+	      cells[ii*params.nx + jj].speeds[8] = tmp[8]*omega_dif + c2 * (d + 4.5*u_dif*(2.0/3.0+u_dif)); 
 
                 tot_u += sqrt(u_x*u_x + u_y*u_y);
                 ++tot_cells;
 	    }
-
-	    /*
-	    cells[ii*params.nx + jj].speeds[1] = has_Obs ? tmp[3] : tmp[1]*omega_dif + c1 * (1.0 + (3.0)*u_x + (u_x * u_x)*(4.5) -u_sq*(1.5));
-	    cells[ii*params.nx + jj].speeds[2] = has_Obs ? tmp[4] : tmp[2]*omega_dif + c1 * (1.0 + (3.0)*u_y + (u_y * u_y)*(4.5) -u_sq*(1.5));
-	    cells[ii*params.nx + jj].speeds[3] = has_Obs ? tmp[1] : tmp[3]*omega_dif + c1 * (1.0 - (3.0)*(u_x) + (u_x * u_x)*(4.5) -u_sq*(1.5));
-            cells[ii*params.nx + jj].speeds[4] = has_Obs ? tmp[2] : tmp[4]*omega_dif + c1 * (1.0 - (3.0)*u_y + (u_y * u_y)*(4.5) -u_sq*(1.5));
-	    cells[ii*params.nx + jj].speeds[5] = has_Obs ? tmp[7] : tmp[5]*omega_dif + c2 * (1.0 + (3.0)*(u_x+u_y) + ((u_x+u_y) * (u_x+u_y))*(4.5) -u_sq*(1.5));
-	    cells[ii*params.nx + jj].speeds[6] = has_Obs ? tmp[8] : tmp[6]*omega_dif + c2 * (1.0 + (3.0)*(-u_x+u_y) + ((-u_x+u_y) * (-u_x+u_y))*(4.5) -u_sq*(1.5));
-	    cells[ii*params.nx + jj].speeds[7] = has_Obs ? tmp[5] : tmp[7]*omega_dif + c2 * (1.0 + (3.0)*(-u_x-u_y) + ((-u_x-u_y) * (-u_x-u_y))*(4.5) -u_sq*(1.5));
-	    cells[ii*params.nx + jj].speeds[8] = has_Obs ? tmp[6] : tmp[8]*omega_dif + c2 * (1.0 + (3.0)*(u_x-u_y) + ((u_x-u_y)*(u_x-u_y))*(4.5) -u_sq*(1.5));
-	    cells[ii*params.nx + jj].speeds[0] = has_Obs ? tmp[0] : tmp[0]*omega_dif + c0 * (1 - u_sq / (2.0 * c_sq));	    		
-	    if(!has_Obs) {
-                tot_u += sqrt(u_x*u_x + u_y*u_y);
-                ++tot_cells;
-	    }*/
         }
     }
     return tot_u / (float)tot_cells;
