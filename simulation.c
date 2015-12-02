@@ -67,15 +67,12 @@ void accelerate_flow(const param_t params, const accel_area_t accel_area,
 float simulation_steps(const param_t params, speed_t* cells, const speed_t* old_cells, int* obstacles)
 {
   int ii,jj, kk;            /* generic counters */
-    const float c_sq = 1.0/3.0;  /* square of speed of sound */
-    const float w0 = 4.0/9.0;    /* weighting factor */
-    const float w1 = 1.0/9.0;    /* weighting factor */
-    const float w2 = 1.0/36.0;   /* weighting factor */
-
-    float u[NSPEEDS];            /* directional velocities */
-    float d_equ[NSPEEDS];        /* equilibrium densities */
     int    tot_cells = 0;  /* no. of cells used in calculation */
     float tot_u = 0;          /* accumulated magnitudes of velocity for each cell */
+    const float w0 = (params.omega * 4) / 9.0;
+    const float w1 = params.omega / 9.0;
+    const float w2 = params.omega / 36.0;
+    const float omega_dif = 1.0-params.omega;
 
     /* loop over _all_ cells */
 #pragma omp parallel for reduction(+:tot_cells,tot_u) shared(cells, old_cells, obstacles) private(ii, jj, kk, u_x, u_y, u_sq, local_density, u, d_equ) default(none) schedule(auto)
@@ -99,21 +96,20 @@ float simulation_steps(const param_t params, speed_t* cells, const speed_t* old_
             tmp[6] = old_cells[y_s*params.nx + x_e].speeds[6]; /* north-west */
             tmp[7] = old_cells[y_n*params.nx + x_e].speeds[7]; /* south-west */
             tmp[8] = old_cells[y_n*params.nx + x_w].speeds[8]; /* south-east */
-            
-	    if (obstacles[ii*params.nx + jj])
-	      {
-		cells[ii*params.nx + jj].speeds[1] = tmp[3];
-                cells[ii*params.nx + jj].speeds[2] = tmp[4];
-                cells[ii*params.nx + jj].speeds[3] = tmp[1];
-                cells[ii*params.nx + jj].speeds[4] = tmp[2];
-                cells[ii*params.nx + jj].speeds[5] = tmp[7];
-                cells[ii*params.nx + jj].speeds[6] = tmp[8];
-                cells[ii*params.nx + jj].speeds[7] = tmp[5];
-                cells[ii*params.nx + jj].speeds[8] = tmp[6];
-	      } 
-	    else
-	      {
-		const float local_density = tmp[0] + tmp[1] + tmp[2] + tmp[3] + tmp[4] + tmp[5] + tmp[6] + tmp[7] + tmp[8];
+              
+
+	    if(obstacles[ii*params.nx + jj]) {
+	      cells[ii*params.nx + jj].speeds[1] = tmp[3];
+	      cells[ii*params.nx + jj].speeds[2] = tmp[4];
+	      cells[ii*params.nx + jj].speeds[3] = tmp[1];
+	      cells[ii*params.nx + jj].speeds[4] = tmp[2];
+	      cells[ii*params.nx + jj].speeds[5] = tmp[7];
+	      cells[ii*params.nx + jj].speeds[6] = tmp[8];
+	      cells[ii*params.nx + jj].speeds[7] = tmp[5];
+	      cells[ii*params.nx + jj].speeds[8] = tmp[6];
+	    }
+	    else {
+	      const float local_density = tmp[0] + tmp[1] + tmp[2] + tmp[3] + tmp[4] + tmp[5] + tmp[6] + tmp[7] + tmp[8];
                 const float u_x = (tmp[1] +
                         tmp[5] +
                         tmp[8]
@@ -131,28 +127,40 @@ float simulation_steps(const param_t params, speed_t* cells, const speed_t* old_
                     / local_density;
 
                 const float u_sq = u_x * u_x + u_y * u_y;
-		const float c1 = local_density / 9.0;
-		const float c2 = local_density / 36.0;
+		const float c0 = w0 * local_density;
+		const float c1 = w1 * local_density;
+		const float c2 = w2 * local_density;
+		const float sum = u_x+u_y;
+		const float diff = u_x - u_y;
 
+	      cells[ii*params.nx + jj].speeds[0] = tmp[0]*omega_dif + c0 * (1 - u_sq*(1.5));
+	      cells[ii*params.nx + jj].speeds[1] = tmp[1]*omega_dif + c1 * (1.0 + (3.0)*u_x + (u_x * u_x)*(4.5) -u_sq*(1.5)); 
+	      cells[ii*params.nx + jj].speeds[2] = tmp[2]*omega_dif + c1 * (1.0 + (3.0)*u_y + (u_y * u_y)*(4.5) -u_sq*(1.5)); 
+	      cells[ii*params.nx + jj].speeds[3] = tmp[3]*omega_dif + c1 * (1.0 - (3.0)*(u_x) + (u_x * u_x)*(4.5) -u_sq*(1.5)); 
+	      cells[ii*params.nx + jj].speeds[4] = tmp[4]*omega_dif + c1 * (1.0 - (3.0)*u_y + (u_y * u_y)*(4.5) -u_sq*(1.5)); 
+	      cells[ii*params.nx + jj].speeds[5] = tmp[5]*omega_dif + c2 * (1.0 + (3.0)*(u_x+u_y) + ((u_x+u_y) * (u_x+u_y))*(4.5) -u_sq*(1.5)); 
+	      cells[ii*params.nx + jj].speeds[6] = tmp[6]*omega_dif + c2 * (1.0 + (3.0)*(-u_x+u_y) + ((-u_x+u_y) * (-u_x+u_y))*(4.5) -u_sq*(1.5));
+	      cells[ii*params.nx + jj].speeds[7] = tmp[7]*omega_dif + c2 * (1.0 + (3.0)*(-u_x-u_y) + ((-u_x-u_y) * (-u_x-u_y))*(4.5) -u_sq*(1.5)); 
+	      cells[ii*params.nx + jj].speeds[8] = tmp[8]*omega_dif + c2 * (1.0 + (3.0)*(u_x-u_y) + ((u_x-u_y)*(u_x-u_y))*(4.5) -u_sq*(1.5)); 
 
-                d_equ[0] = w0 * local_density * (1.0 - u_sq / (2.0 * c_sq));
-                d_equ[1] = c1 * (1.0 + (3.0)*u_x + (u_x * u_x)*(4.5) -u_sq*(1.5));
-                d_equ[2] = c1 * (1.0 + (3.0)*u_y + (u_y * u_y)*(4.5) -u_sq*(1.5));
-                d_equ[3] = c1 * (1.0 - (3.0)*(u_x) + (u_x * u_x)*(4.5) -u_sq*(1.5)); 
-                d_equ[4] = c1 * (1.0 - (3.0)*u_y + (u_y * u_y)*(4.5) -u_sq*(1.5));
-                d_equ[5] = c2 * (1.0 + (3.0)*(u_x+u_y) + ((u_x+u_y) * (u_x+u_y))*(4.5) -u_sq*(1.5));
-                d_equ[6] = c2 * (1.0 + (3.0)*(-u_x+u_y) + ((-u_x+u_y) * (-u_x+u_y))*(4.5) -u_sq*(1.5));
-                d_equ[7] = c2 * (1.0 + (3.0)*(-u_x-u_y) + ((-u_x-u_y) * (-u_x-u_y))*(4.5) -u_sq*(1.5));
-                d_equ[8] = c2 * (1.0 + (3.0)*(u_x-u_y) + ((u_x-u_y)*(u_x-u_y))*(4.5) -u_sq*(1.5));
-
-                for (kk = 0; kk < NSPEEDS; kk++)
-                {
-		  cells[ii*params.nx+jj].speeds[kk] = (tmp[kk] + params.omega * 
-                        (d_equ[kk] - tmp[kk]));
-                }
                 tot_u += sqrt(u_x*u_x + u_y*u_y);
                 ++tot_cells;
-	      }
+	    }
+
+	    /*
+	    cells[ii*params.nx + jj].speeds[1] = has_Obs ? tmp[3] : tmp[1]*omega_dif + c1 * (1.0 + (3.0)*u_x + (u_x * u_x)*(4.5) -u_sq*(1.5));
+	    cells[ii*params.nx + jj].speeds[2] = has_Obs ? tmp[4] : tmp[2]*omega_dif + c1 * (1.0 + (3.0)*u_y + (u_y * u_y)*(4.5) -u_sq*(1.5));
+	    cells[ii*params.nx + jj].speeds[3] = has_Obs ? tmp[1] : tmp[3]*omega_dif + c1 * (1.0 - (3.0)*(u_x) + (u_x * u_x)*(4.5) -u_sq*(1.5));
+            cells[ii*params.nx + jj].speeds[4] = has_Obs ? tmp[2] : tmp[4]*omega_dif + c1 * (1.0 - (3.0)*u_y + (u_y * u_y)*(4.5) -u_sq*(1.5));
+	    cells[ii*params.nx + jj].speeds[5] = has_Obs ? tmp[7] : tmp[5]*omega_dif + c2 * (1.0 + (3.0)*(u_x+u_y) + ((u_x+u_y) * (u_x+u_y))*(4.5) -u_sq*(1.5));
+	    cells[ii*params.nx + jj].speeds[6] = has_Obs ? tmp[8] : tmp[6]*omega_dif + c2 * (1.0 + (3.0)*(-u_x+u_y) + ((-u_x+u_y) * (-u_x+u_y))*(4.5) -u_sq*(1.5));
+	    cells[ii*params.nx + jj].speeds[7] = has_Obs ? tmp[5] : tmp[7]*omega_dif + c2 * (1.0 + (3.0)*(-u_x-u_y) + ((-u_x-u_y) * (-u_x-u_y))*(4.5) -u_sq*(1.5));
+	    cells[ii*params.nx + jj].speeds[8] = has_Obs ? tmp[6] : tmp[8]*omega_dif + c2 * (1.0 + (3.0)*(u_x-u_y) + ((u_x-u_y)*(u_x-u_y))*(4.5) -u_sq*(1.5));
+	    cells[ii*params.nx + jj].speeds[0] = has_Obs ? tmp[0] : tmp[0]*omega_dif + c0 * (1 - u_sq / (2.0 * c_sq));	    		
+	    if(!has_Obs) {
+                tot_u += sqrt(u_x*u_x + u_y*u_y);
+                ++tot_cells;
+	    }*/
         }
     }
     return tot_u / (float)tot_cells;
