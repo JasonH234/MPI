@@ -217,6 +217,8 @@ void initialise(const char* param_file, accel_area_t * accel_area,
         }
     }
 
+    // initialise total cells to 0
+    params->tot_cells = 0;
     /* Fill in locations of obstacles */
     for (ii = 0; ii < params->ny; ii++)
     {
@@ -233,9 +235,13 @@ void initialise(const char* param_file, accel_area_t * accel_area,
                     y_pos >= obstacles[kk].obs_y_min &&
                     y_pos <  obstacles[kk].obs_y_max)
                 {
-                    (*obstacles_ptr)[ii*params->nx + jj] = 1;
+		  (*obstacles_ptr)[ii*params->nx + jj] = 1;		  
                 }
             }
+	    // if cell is not an obstacle, increment total cell count.
+	    if((*obstacles_ptr)[ii*params->nx +jj] == 0) {
+		  params->tot_cells ++;
+	    }
         }
     }
 

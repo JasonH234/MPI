@@ -12,6 +12,7 @@ typedef struct {
     int nx;            /* no. of cells in x-direction */
     int ny;            /* no. of cells in y-direction */
     int max_iters;      /* no. of iterations */
+    int tot_cells;
     int reynolds_dim;  /* dimension for Reynolds number */
     float density;       /* density per link */
     float accel;         /* density redistribution */
