@@ -55,8 +55,9 @@
 #include <time.h>
 #include <sys/time.h>
 #include <sys/resource.h>
-
+#include <stddef.h>
 #include "lbm.h"
+#include "mpi.h"
 
 /*
 ** main program:
@@ -71,8 +72,9 @@ int main(int argc, char* argv[])
     accel_area_t accel_area;
 
     param_t  params;              /* struct to hold parameter values */
-    speed_t* cells_even     = NULL;    /* grid containing fluid densities */
-    speed_t* cells_odd = NULL;    /* scratch space */
+    speed_t* cells = NULL;
+    speed_t* cells_even = (speed_t*) malloc(sizeof(speed_t)*(params.ny*params.nx));    /* grid containing fluid densities */
+    speed_t* cells_odd = (speed_t*) malloc(sizeof(speed_t)*(params.ny*params.nx));    /* scratch space */
     int*     obstacles = NULL;    /* grid indicating which cells are blocked */
     float*  av_vels   = NULL;    /* a record of the av. velocity computed for each timestep */
 
@@ -83,17 +85,62 @@ int main(int argc, char* argv[])
     double usrtim;                /* floating point number to record elapsed user CPU time */
     double systim;                /* floating point number to record elapsed system CPU time */
 
-    parse_args(argc, argv, &final_state_file, &av_vels_file, &param_file);
+    int flag, size, rank, name_len;
+    char processor_name[MPI_MAX_PROCESSOR_NAME];
+    MPI_Init(NULL, NULL);
+    MPI_Initialized(&flag);
+    if(flag == 0) {
+      MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+    }
 
-    initialise(param_file, &accel_area, &params, &cells_even, &cells_odd, &obstacles, &av_vels);
+    //Name
+    MPI_Get_processor_name(processor_name, &name_len);
+    //Process number
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    //Rank
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-    /* iterate for max_iters timesteps */
-    gettimeofday(&timstr,NULL);
-    tic=timstr.tv_sec+(timstr.tv_usec/1000000.0);
+    
+      const int count = 8;
+      int blocks[8] = {1,1,1,1,1,1,1,1};
+      MPI_Aint offsets[8];
+      offsets[0] = offsetof(param_t, nx);
+      offsets[1] = offsetof(param_t, ny);
+      offsets[2] = offsetof(param_t, max_iters);
+      offsets[3] = offsetof(param_t, tot_cells);
+      offsets[4] = offsetof(param_t, reynolds_dim);
+      offsets[5] = offsetof(param_t, density);
+      offsets[6] = offsetof(param_t, accel);
+      offsets[7] = offsetof(param_t, omega);
+      MPI_Datatype types[8] = {MPI_INT, MPI_INT, MPI_INT, MPI_INT, MPI_INT,
+			       MPI_FLOAT, MPI_FLOAT, MPI_FLOAT};
+      MPI_Datatype MPI_PARAM_T;
+
+      MPI_Type_create_struct(count, blocks, offsets, types, &MPI_PARAM_T);
+      MPI_Type_commit(&MPI_PARAM_T);
+
+    // master initialise
+    if(rank == 0) {
+      parse_args(argc, argv, &final_state_file, &av_vels_file, &param_file);
+      initialise(param_file, &accel_area, &params, &cells_even, &cells_odd, &obstacles, &av_vels);
+      
+      gettimeofday(&timstr,NULL);
+      tic=timstr.tv_sec+(timstr.tv_usec/1000000.0);
+
+    }
+    // share params
+    MPI_Bcast(&params, 1, MPI_PARAM_T, 0, MPI_COMM_WORLD);
+    
+    
+   
+    printf("Hello world from processor %s, rank %d, out of %d processors\n", processor_name, rank, size);
+    printf("I have %d,%d total cell grid size. Omg %f\n", params.nx, params.ny, params.omega);
+    int expected_cells = (rank == size-1) ? (params.ny%size + params.ny/size) * params.nx : (params.ny/size) * params.nx;
+    printf("Expecting %d cells\n", expected_cells);
 
     for (ii = 0; ii < params.max_iters; ii++)
     {
-	if(ii % 2 == 0) {
+      /*	if(ii % 2 == 0) {
 	  accelerate_flow(params, accel_area, cells_even, obstacles);
 	  av_vels[ii] = simulation_steps(params, cells_odd, cells_even, obstacles);
 	}
@@ -101,7 +148,7 @@ int main(int argc, char* argv[])
 	  accelerate_flow(params, accel_area, cells_odd, obstacles);
 	  av_vels[ii] = simulation_steps(params, cells_even, cells_odd, obstacles);  
 	}
-
+      */
         #ifdef DEBUG
         printf("==timestep: %d==\n", ii);
         printf("av velocity: %.12E\n", av_vels[ii]);
@@ -109,6 +156,7 @@ int main(int argc, char* argv[])
         #endif
     }
 
+    
     gettimeofday(&timstr,NULL);
     toc=timstr.tv_sec+(timstr.tv_usec/1000000.0);
     getrusage(RUSAGE_SELF, &ru);
@@ -117,15 +165,17 @@ int main(int argc, char* argv[])
     timstr=ru.ru_stime;
     systim=timstr.tv_sec+(timstr.tv_usec/1000000.0);
 
-    printf("==done==\n");
-    printf("Reynolds number:\t\t%.12E\n", calc_reynolds(params,av_vels[ii-1]));
-    printf("Elapsed time:\t\t\t%.6f (s)\n", toc-tic);
-    printf("Elapsed user CPU time:\t\t%.6f (s)\n", usrtim);
-    printf("Elapsed system CPU time:\t%.6f (s)\n", systim);
+    if(rank == 0) {
+      printf("Process %d ==done==\n", rank);
+      printf("Reynolds number:\t\t%.12E\n", calc_reynolds(params,av_vels[ii-1]));
+      printf("Elapsed time:\t\t\t%.6f (s)\n", toc-tic);
+      printf("Elapsed user CPU time:\t\t%.6f (s)\n", usrtim);
+      printf("Elapsed system CPU time:\t%.6f (s)\n", systim);
 
-    write_values(final_state_file, av_vels_file, params, cells_even, obstacles, av_vels);
-    finalise(&cells_even, &cells_odd, &obstacles, &av_vels);
-
+      write_values(final_state_file, av_vels_file, params, cells_even, obstacles, av_vels);
+      finalise(&cells_even, &cells_odd, &obstacles, &av_vels);
+    }
+    MPI_Finalize();
     return EXIT_SUCCESS;
 }
 

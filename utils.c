@@ -182,8 +182,8 @@ void initialise(const char* param_file, accel_area_t * accel_area,
     *cells_ptr = (speed_t*) malloc(sizeof(speed_t)*(params->ny*params->nx));
     if (*cells_ptr == NULL) DIE("Cannot allocate memory for cells");
 
-    *tmp_cells_ptr = (speed_t*) malloc(sizeof(speed_t)*(params->ny*params->nx));
-    if (*tmp_cells_ptr == NULL) DIE("Cannot allocate memory for tmp_cells");
+    //    *tmp_cells_ptr = (speed_t*) malloc(sizeof(speed_t)*(params->ny*params->nx));
+    //if (*tmp_cells_ptr == NULL) DIE("Cannot allocate memory for tmp_cells");
 
     *obstacles_ptr = (int*) malloc(sizeof(int)*(params->ny*params->nx));
     if (*obstacles_ptr == NULL) DIE("Cannot allocate memory for patches");

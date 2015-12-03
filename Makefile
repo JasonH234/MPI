@@ -1,4 +1,4 @@
-CC=icc
+CC=mpicc
 
 CFLAGS=-Ofast 
 
