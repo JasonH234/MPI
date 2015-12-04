@@ -72,10 +72,11 @@ int main(int argc, char* argv[])
     accel_area_t accel_area;
 
     param_t  params;              /* struct to hold parameter values */
-    speed_t* cells = NULL;
-    speed_t* cells_even = (speed_t*) malloc(sizeof(speed_t)*(params.ny*params.nx));    /* grid containing fluid densities */
-    speed_t* cells_odd = (speed_t*) malloc(sizeof(speed_t)*(params.ny*params.nx));    /* scratch space */
-    int*     obstacles = NULL;    /* grid indicating which cells are blocked */
+    speed_t* cells_whole = NULL;
+    speed_t* cells_even = NULL;    /* grid containing fluid densities */
+    speed_t* cells_odd = NULL;
+    int*     obstacles_whole = NULL;    /* grid indicating which cells are blocked */
+    int* obstacles = NULL;
     float*  av_vels   = NULL;    /* a record of the av. velocity computed for each timestep */
 
     int    ii;                    /*  generic counter */
@@ -115,15 +116,33 @@ int main(int argc, char* argv[])
       MPI_Datatype types[8] = {MPI_INT, MPI_INT, MPI_INT, MPI_INT, MPI_INT,
 			       MPI_FLOAT, MPI_FLOAT, MPI_FLOAT};
       MPI_Datatype MPI_PARAM_T;
-
       MPI_Type_create_struct(count, blocks, offsets, types, &MPI_PARAM_T);
       MPI_Type_commit(&MPI_PARAM_T);
+
+      const int cell_count = 1;
+      int cell_blocks[1] = {9};
+      MPI_Aint cell_offsets[1] ={offsetof(speed_t, speeds)};
+      MPI_Datatype cell_types[1] = {MPI_FLOAT};
+      MPI_Datatype MPI_SPEED_T;
+      MPI_Type_create_struct(cell_count, cell_blocks, cell_offsets, cell_types, &MPI_SPEED_T);
+      MPI_Type_commit(&MPI_SPEED_T);
+
+      // accel variables
+    int idx;
+    int is_row;
 
     // master initialise
     if(rank == 0) {
       parse_args(argc, argv, &final_state_file, &av_vels_file, &param_file);
-      initialise(param_file, &accel_area, &params, &cells_even, &cells_odd, &obstacles, &av_vels);
+      initialise(param_file, &accel_area, &params, &cells_whole, &obstacles_whole, &av_vels);
       
+      //set accel variables for broadcast
+      idx = accel_area.idx;
+      if(accel_area.col_or_row == ACCEL_ROW)
+	is_row = 1;
+      else
+	is_row = 0;
+
       gettimeofday(&timstr,NULL);
       tic=timstr.tv_sec+(timstr.tv_usec/1000000.0);
 
@@ -131,24 +150,65 @@ int main(int argc, char* argv[])
     // share params
     MPI_Bcast(&params, 1, MPI_PARAM_T, 0, MPI_COMM_WORLD);
     
-    
-   
+    MPI_Bcast(&idx, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&is_row, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+    if(rank > 0) {
+      accel_area.idx = idx;
+      accel_area.col_or_row = (is_row == 1) ? ACCEL_ROW : ACCEL_COLUMN;
+    }
+
+    int do_accel = 1;
+    if(accel_area.col_or_row == ACCEL_ROW) {
+      int low = rank * (int) params.ny/size;
+      int high = (rank+1) * (int) params.ny/size;
+      do_accel = (accel_area.idx >= low && accel_area.idx < high) ? 1 : 0;
+      printf("Process %d, idx %d, answer %d\n", rank, accel_area.idx, do_accel);
+      if(do_accel)
+	accel_area.idx -=low; 
+    }
+
+    const int group_size = ((int)params.ny/size) * params.nx;
     printf("Hello world from processor %s, rank %d, out of %d processors\n", processor_name, rank, size);
-    printf("I have %d,%d total cell grid size. Omg %f\n", params.nx, params.ny, params.omega);
-    int expected_cells = (rank == size-1) ? (params.ny%size + params.ny/size) * params.nx : (params.ny/size) * params.nx;
+    const int expected_cells = (rank == size-1) ? (params.ny%size) * params.nx + group_size : group_size;
+    const int padding = 2 * params.nx;
     printf("Expecting %d cells\n", expected_cells);
 
+    int group_sizes[size];
+    int displacements[size];
+    for (ii = 0; ii < size; ii++)
+      {
+	group_sizes[ii] = group_size;
+	displacements[ii] = (group_size) * ii; 
+      }
+    group_sizes[size-1] += (params.ny%size)*params.nx; 
+    // allocate cells memory, with two rows padding
+    cells_even = (speed_t*) malloc(sizeof(speed_t)*(expected_cells+padding));
+    cells_odd = (speed_t*) malloc(sizeof(speed_t)*(expected_cells+padding));
+    obstacles = (int*) malloc(sizeof(int)*(expected_cells+padding));
+
+    MPI_Scatterv(cells_whole, group_sizes, displacements, MPI_SPEED_T, cells_even, expected_cells, MPI_SPEED_T, 0, MPI_COMM_WORLD);
+    MPI_Scatterv(obstacles_whole, group_sizes, displacements, MPI_INT, obstacles, expected_cells, MPI_INT, 0, MPI_COMM_WORLD);
+    
+
+    // save size of full grid before setting to cropped size
+    int full_y = params.ny;
+    params.ny = (rank == size-1) ? (params.ny%size) + (int) params.ny/size : (int) params.ny/size;
     for (ii = 0; ii < params.max_iters; ii++)
     {
-      /*	if(ii % 2 == 0) {
-	  accelerate_flow(params, accel_area, cells_even, obstacles);
-	  av_vels[ii] = simulation_steps(params, cells_odd, cells_even, obstacles);
-	}
+      float av_vel;
+       	if(ii % 2 == 0) {
+	  if(do_accel)
+	    accelerate_flow(params, accel_area, cells_even, obstacles);
+	  av_vel = simulation_steps(params, cells_odd, cells_even, obstacles);
+	  }
 	else {
-	  accelerate_flow(params, accel_area, cells_odd, obstacles);
-	  av_vels[ii] = simulation_steps(params, cells_even, cells_odd, obstacles);  
+	  if(do_accel)
+	    accelerate_flow(params, accel_area, cells_odd, obstacles);
+	  av_vel = simulation_steps(params, cells_even, cells_odd, obstacles);
 	}
-      */
+	//this could be moved to end 
+	MPI_Reduce(&av_vel, &av_vels[ii], 1, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
         #ifdef DEBUG
         printf("==timestep: %d==\n", ii);
         printf("av velocity: %.12E\n", av_vels[ii]);
@@ -156,24 +216,32 @@ int main(int argc, char* argv[])
         #endif
     }
 
-    
-    gettimeofday(&timstr,NULL);
-    toc=timstr.tv_sec+(timstr.tv_usec/1000000.0);
-    getrusage(RUSAGE_SELF, &ru);
-    timstr=ru.ru_utime;
-    usrtim=timstr.tv_sec+(timstr.tv_usec/1000000.0);
-    timstr=ru.ru_stime;
-    systim=timstr.tv_sec+(timstr.tv_usec/1000000.0);
+    if(ii%2 == 0) {
+      MPI_Gatherv(cells_even, expected_cells, MPI_SPEED_T, cells_whole, group_sizes,
+		  displacements, MPI_SPEED_T, 0, MPI_COMM_WORLD); 
+    }
+    else {
+      MPI_Gatherv(cells_even, expected_cells, MPI_SPEED_T, cells_whole, group_sizes,
+		  displacements, MPI_SPEED_T, 0, MPI_COMM_WORLD); 
+    }
 
     if(rank == 0) {
+      gettimeofday(&timstr,NULL);
+      toc=timstr.tv_sec+(timstr.tv_usec/1000000.0);
+      getrusage(RUSAGE_SELF, &ru);
+      timstr=ru.ru_utime;
+      usrtim=timstr.tv_sec+(timstr.tv_usec/1000000.0);
+      timstr=ru.ru_stime;
+      systim=timstr.tv_sec+(timstr.tv_usec/1000000.0);
+
       printf("Process %d ==done==\n", rank);
       printf("Reynolds number:\t\t%.12E\n", calc_reynolds(params,av_vels[ii-1]));
       printf("Elapsed time:\t\t\t%.6f (s)\n", toc-tic);
       printf("Elapsed user CPU time:\t\t%.6f (s)\n", usrtim);
       printf("Elapsed system CPU time:\t%.6f (s)\n", systim);
 
-      write_values(final_state_file, av_vels_file, params, cells_even, obstacles, av_vels);
-      finalise(&cells_even, &cells_odd, &obstacles, &av_vels);
+      write_values(final_state_file, av_vels_file, params, cells_whole, obstacles_whole, av_vels);
+      finalise(&cells_whole, &cells_even, &cells_odd, &obstacles_whole, &obstacles, &av_vels);
     }
     MPI_Finalize();
     return EXIT_SUCCESS;
