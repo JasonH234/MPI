@@ -154,6 +154,6 @@ float simulation_steps(const param_t params, speed_t* cells, const speed_t* old_
 	      }
         }
     }
-    return tot_u / (float)params.tot_cells;
+    return tot_u;
 }
 
