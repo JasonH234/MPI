@@ -76,17 +76,15 @@ float simulation_steps(const param_t params, speed_t* cells, const speed_t* old_
     float d_equ[NSPEEDS];        /* equilibrium densities */
     float tot_u = 0;          /* accumulated magnitudes of velocity for each cell */
 
-    /* loop over _all_ cells */
-#pragma omp parallel for reduction(+:tot_u) shared(cells, old_cells, obstacles) private(ii, jj, kk, d_equ) default(none) schedule(auto)
     for (ii = 0; ii < params.ny; ii++)
     {
         for (jj = 0; jj < params.nx; jj++)
         {
 	    float tmp[NSPEEDS];
             int x_e,x_w,y_n,y_s;  /* indices of neighbouring cells */
-            y_n = (ii + 1) % params.ny;
+            y_n = (ii + 1) % params.ny+1;
             x_e = (jj + 1) % params.nx;
-            y_s = (ii == 0) ? (ii + params.ny - 1) : (ii - 1);
+            y_s = (ii == 0) ? (ii + params.ny + 1) : (ii - 1);
             x_w = (jj == 0) ? (jj + params.nx - 1) : (jj - 1);
 
             tmp[0]  = old_cells[ii*params.nx + jj].speeds[0]; /* central cell, */                                                     /* no movement   */

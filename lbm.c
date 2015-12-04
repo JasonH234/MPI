@@ -163,13 +163,11 @@ int main(int argc, char* argv[])
       int low = rank * (int) params.ny/size;
       int high = (rank+1) * (int) params.ny/size;
       do_accel = (accel_area.idx >= low && accel_area.idx < high) ? 1 : 0;
-      printf("Process %d, idx %d, answer %d\n", rank, accel_area.idx, do_accel);
       if(do_accel)
 	accel_area.idx -=low; 
     }
 
     const int group_size = ((int)params.ny/size) * params.nx;
-    printf("Hello world from processor %s, rank %d, out of %d processors\n", processor_name, rank, size);
     const int expected_cells = (rank == size-1) ? (params.ny%size) * params.nx + group_size : group_size;
     const int padding = 2 * params.nx;
 
@@ -295,6 +293,7 @@ int main(int argc, char* argv[])
         #endif
     }
 
+    //Restore full grid
     if(ii%2 == 0) {
       MPI_Gatherv(cells_odd, expected_cells, MPI_SPEED_T, cells_whole, group_sizes,
 		  displacements, MPI_SPEED_T, 0, MPI_COMM_WORLD); 
@@ -305,6 +304,7 @@ int main(int argc, char* argv[])
     }
 
     if(rank == 0) {
+      params.ny = full_y;
       gettimeofday(&timstr,NULL);
       toc=timstr.tv_sec+(timstr.tv_usec/1000000.0);
       getrusage(RUSAGE_SELF, &ru);
