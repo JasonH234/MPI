@@ -74,7 +74,7 @@ float simulation_steps(const param_t params, speed_t* cells, const speed_t* old_
     const float omega_dif = 1.0-params.omega;
     
     float d_equ[NSPEEDS];        /* equilibrium densities */
-    float tot_u = 0;          /* accumulated magnitudes of velocity for each cell */
+    float tot_u = 0.0;          /* accumulated magnitudes of velocity for each cell */
 
     for (ii = 0; ii < params.ny; ii++)
     {
@@ -147,7 +147,7 @@ float simulation_steps(const param_t params, speed_t* cells, const speed_t* old_
                 {
 		  cells[ii*params.nx+jj].speeds[kk] = (tmp[kk]*omega_dif +d_equ[kk]);
                 }
-                tot_u += sqrt(u_x*u_x + u_y*u_y);
+                tot_u += sqrt(u_sq);
 	      }
         }
     }

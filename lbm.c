@@ -173,66 +173,39 @@ int main(int argc, char* argv[])
     const int expected_cells = (rank == size-1) ? (params.ny%size) * params.nx + group_size : group_size;
     const int padding = 2 * params.nx;
 
+    // allocate and initialise cells memory, with two rows padding
+    initialise_worker(params, &cells_even, &cells_odd, &obstacles, expected_cells);
+
     int group_sizes[size];
     int displacements[size];
-    for (ii = 0; ii < size; ii++)
-      {
-	group_sizes[ii] = group_size;
-	displacements[ii] = (group_size) * ii; 
-      }
+    for (ii = 0; ii < size; ii++) {
+	    group_sizes[ii] = group_size;
+	    displacements[ii] = (group_size) * ii; 
+    }
     group_sizes[size-1] += (params.ny%size)*params.nx; 
-    // allocate cells memory, with two rows padding
-    cells_even = (speed_t*) malloc(sizeof(speed_t)*(expected_cells+padding));
-    cells_odd = (speed_t*) malloc(sizeof(speed_t)*(expected_cells+padding));
-    obstacles = (int*) malloc(sizeof(int)*(expected_cells+padding));
-
-    MPI_Scatterv(cells_whole, group_sizes, displacements, MPI_SPEED_T, cells_even, expected_cells, MPI_SPEED_T, 0, MPI_COMM_WORLD);
+    //send obstacles
     MPI_Scatterv(obstacles_whole, group_sizes, displacements, MPI_INT, obstacles, expected_cells, MPI_INT, 0, MPI_COMM_WORLD);
-
+    MPI_Barrier(MPI_COMM_WORLD);
     // save size of full grid before setting to cropped size
     int full_y = params.ny;
     params.ny = (rank == size-1) ? (params.ny%size) + (int) params.ny/size : (int) params.ny/size;
-    printf("Params: %d\n", params.ny);
+
+    //Calculate offsets
     int end = expected_cells - params.nx;
     int pad1 = expected_cells;
     int pad2 = expected_cells + params.nx;
-    
+    //Calculate neighbour workers
     int down = (rank+1)%size;
     int up = (rank == 0) ? size-1 : rank-1; 
-
-    /*
-    // send obstacle padding
-	  if(rank%2 == 0) {
-	    MPI_Send(&obstacles[0], params.nx, MPI_INT, 
-		     up, 0, MPI_COMM_WORLD);
-	    MPI_Recv(&obstacles[pad2], params.nx, MPI_INT, up, 0, 
-		     MPI_COMM_WORLD, NULL);
-	    MPI_Send(&obstacles[end], params.nx, MPI_INT, 
-		     down, 0, MPI_COMM_WORLD);
-	    MPI_Recv(&obstacles[pad1], params.nx, MPI_INT, down, 0, 
-		     MPI_COMM_WORLD, NULL);
-	  }
-	  else {
-	    MPI_Recv(&obstacles[pad1], params.nx, MPI_INT, down, 0, 
-		     MPI_COMM_WORLD, NULL);
-	    MPI_Send(&obstacles[end], params.nx, MPI_INT, 
-		     down, 0, MPI_COMM_WORLD);
-	    MPI_Recv(&obstacles[pad2], params.nx, MPI_INT, up, 0, 
-		     MPI_COMM_WORLD, NULL);
-	    MPI_Send(&obstacles[0], params.nx, MPI_INT, 
-		     up, 0, MPI_COMM_WORLD);
-	  }
-
-    */
-
+    //for(ii=0; ii< 5; ii++)
     for (ii = 0; ii < params.max_iters; ii++)
     {
 
-      float av_vel;
-      if(ii % 2 == 0) {
-	/*if(do_accel)
+    float av_vel;
+    if(ii % 2 == 0) {
+	  if(do_accel)
 	     accelerate_flow(params, accel_area, cells_even, obstacles);
-	*/
+	
 	  // only even send
 	  if(rank%2 == 0) {
 	    MPI_Send(&cells_even[0], params.nx, MPI_SPEED_T, 
@@ -255,7 +228,7 @@ int main(int argc, char* argv[])
 		     up, 0, MPI_COMM_WORLD);
 	  }
 	  
-	  if(ii == 0) {
+	  /*if(ii == 0) {
 	    int jj, kk;
 	    for (jj = 0; jj < params.ny+2; jj++) {
 	      for(kk = 0; kk < params.nx; kk++) {
@@ -271,14 +244,14 @@ int main(int argc, char* argv[])
 		}
 	      }
 	    }
-	  }
-
+	  }*/
+      MPI_Barrier(MPI_COMM_WORLD);
 	  av_vel = simulation_steps(params, cells_odd, cells_even, obstacles); 
 	}
 	else {
-	  /*if(do_accel)
+	  if(do_accel)
 	    accelerate_flow(params, accel_area, cells_odd, obstacles);
-	  */
+	  
 	  if(rank%2 == 0) {
 	    MPI_Send(&cells_odd[0], params.nx, MPI_SPEED_T, 
 		     up, 0, MPI_COMM_WORLD);
@@ -299,19 +272,14 @@ int main(int argc, char* argv[])
 	    MPI_Send(&cells_odd[0], params.nx, MPI_SPEED_T, 
 		     up, 0, MPI_COMM_WORLD);
 	  }
-
+      MPI_Barrier(MPI_COMM_WORLD);
 	  av_vel = simulation_steps(params, cells_even, cells_odd, obstacles);
 	}
 	//this could be moved to end
-        float sum;
-        if(ii == params.max_iters-1) {
-	  //printf("Process %d, av velocity: %.12E\n", rank, av_vel);
-        }
-	MPI_Reduce(&av_vel, &sum, 1, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
-	if(rank == 0) {
-	  av_vels[ii] = sum;
-	  //printf("av velocity: %.12E\n", sum);
-	}
+	MPI_Reduce(&av_vel, &av_vels[ii], 1, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
+	//if(rank == 0) 
+		//printf("av velocity: %.12E\n", av_vels[ii]);
+
         #ifdef DEBUG
         printf("==timestep: %d==\n", ii);
         printf("av velocity: %.12E\n", av_vels[ii]);

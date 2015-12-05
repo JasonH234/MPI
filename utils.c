@@ -94,6 +94,41 @@ void parse_args (int argc, char* argv[],
     }
 }
 
+
+void initialise_worker(param_t params, speed_t** cells_even_ptr, 
+	speed_t** cells_odd_ptr, int** obstacles_ptr, const int expected_cells)
+{
+    *cells_even_ptr = (speed_t*) malloc(sizeof(speed_t)*(expected_cells+2*params.nx));
+    *cells_odd_ptr = (speed_t*) malloc(sizeof(speed_t)*(expected_cells+2*params.nx));
+    *obstacles_ptr = (int*) malloc(sizeof(int)*(expected_cells));
+
+    float w0 = params.density * 4.0/9.0;
+    float w1 = params.density      /9.0;
+    float w2 = params.density      /36.0;
+
+    int ii, jj;
+    /* Initialise arrays */
+    for (ii = 0; ii < params.ny; ii++)
+    {
+        for (jj = 0; jj < params.nx; jj++)
+        {
+            /* centre */
+            (*cells_even_ptr)[ii*params.nx + jj].speeds[0] = w0;
+            /* axis directions */
+            (*cells_even_ptr)[ii*params.nx + jj].speeds[1] = w1;
+            (*cells_even_ptr)[ii*params.nx + jj].speeds[2] = w1;
+            (*cells_even_ptr)[ii*params.nx + jj].speeds[3] = w1;
+            (*cells_even_ptr)[ii*params.nx + jj].speeds[4] = w1;
+            /* diagonals */
+            (*cells_even_ptr)[ii*params.nx + jj].speeds[5] = w2;
+            (*cells_even_ptr)[ii*params.nx + jj].speeds[6] = w2;
+            (*cells_even_ptr)[ii*params.nx + jj].speeds[7] = w2;
+            (*cells_even_ptr)[ii*params.nx + jj].speeds[8] = w2;
+        }
+    }
+
+}
+
 void initialise(const char* param_file, accel_area_t * accel_area,
     param_t* params, speed_t** cells_ptr,
     int** obstacles_ptr, float** av_vels_ptr)
@@ -182,40 +217,11 @@ void initialise(const char* param_file, accel_area_t * accel_area,
     *cells_ptr = (speed_t*) malloc(sizeof(speed_t)*(params->ny*params->nx));
     if (*cells_ptr == NULL) DIE("Cannot allocate memory for cells");
 
-    //    *tmp_cells_ptr = (speed_t*) malloc(sizeof(speed_t)*(params->ny*params->nx));
-    //if (*tmp_cells_ptr == NULL) DIE("Cannot allocate memory for tmp_cells");
-
     *obstacles_ptr = (int*) malloc(sizeof(int)*(params->ny*params->nx));
     if (*obstacles_ptr == NULL) DIE("Cannot allocate memory for patches");
 
     *av_vels_ptr = (float*) malloc(sizeof(float)*(params->max_iters));
     if (*av_vels_ptr == NULL) DIE("Cannot allocate memory for av_vels");
-
-    w0 = params->density * 4.0/9.0;
-    w1 = params->density      /9.0;
-    w2 = params->density      /36.0;
-
-    /* Initialise arrays */
-    for (ii = 0; ii < params->ny; ii++)
-    {
-        for (jj = 0; jj < params->nx; jj++)
-        {
-            /* centre */
-            (*cells_ptr)[ii*params->nx + jj].speeds[0] = w0;
-            /* axis directions */
-            (*cells_ptr)[ii*params->nx + jj].speeds[1] = w1;
-            (*cells_ptr)[ii*params->nx + jj].speeds[2] = w1;
-            (*cells_ptr)[ii*params->nx + jj].speeds[3] = w1;
-            (*cells_ptr)[ii*params->nx + jj].speeds[4] = w1;
-            /* diagonals */
-            (*cells_ptr)[ii*params->nx + jj].speeds[5] = w2;
-            (*cells_ptr)[ii*params->nx + jj].speeds[6] = w2;
-            (*cells_ptr)[ii*params->nx + jj].speeds[7] = w2;
-            (*cells_ptr)[ii*params->nx + jj].speeds[8] = w2;
-
-            (*obstacles_ptr)[ii*params->nx + jj] = 0;
-        }
-    }
 
     // initialise total cells to 0
     params->tot_cells = 0;
@@ -224,6 +230,7 @@ void initialise(const char* param_file, accel_area_t * accel_area,
     {
         for (jj = 0; jj < params->nx; jj++)
         {
+            (*obstacles_ptr)[ii*params->nx + jj] = 0;
             /* coordinates of (jj, ii) scaled to 'real world' terms */
             const float x_pos = jj*(BOX_X_SIZE/params->nx);
             const float y_pos = ii*(BOX_Y_SIZE/params->ny);
