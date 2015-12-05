@@ -99,7 +99,7 @@ float simulation_steps(const param_t params, speed_t* cells, const speed_t* old_
             
 	    if (obstacles[ii*params.nx + jj])
 	      {
-		cells[ii*params.nx + jj].speeds[1] = tmp[3];
+		        cells[ii*params.nx + jj].speeds[1] = tmp[3];
                 cells[ii*params.nx + jj].speeds[2] = tmp[4];
                 cells[ii*params.nx + jj].speeds[3] = tmp[1];
                 cells[ii*params.nx + jj].speeds[4] = tmp[2];

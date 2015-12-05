@@ -173,9 +173,6 @@ int main(int argc, char* argv[])
     const int expected_cells = (rank == size-1) ? (params.ny%size) * params.nx + group_size : group_size;
     const int padding = 2 * params.nx;
 
-    // allocate and initialise cells memory, with two rows padding
-    initialise_worker(params, &cells_even, &cells_odd, &obstacles, expected_cells);
-
     int group_sizes[size];
     int displacements[size];
     for (ii = 0; ii < size; ii++) {
@@ -184,11 +181,15 @@ int main(int argc, char* argv[])
     }
     group_sizes[size-1] += (params.ny%size)*params.nx; 
     //send obstacles
-    MPI_Scatterv(obstacles_whole, group_sizes, displacements, MPI_INT, obstacles, expected_cells, MPI_INT, 0, MPI_COMM_WORLD);
-    MPI_Barrier(MPI_COMM_WORLD);
+
     // save size of full grid before setting to cropped size
     int full_y = params.ny;
     params.ny = (rank == size-1) ? (params.ny%size) + (int) params.ny/size : (int) params.ny/size;
+    // allocate and initialise cells memory, with two rows padding
+    initialise_worker(params, &cells_even, &cells_odd, &obstacles, expected_cells);
+
+    MPI_Scatterv(obstacles_whole, group_sizes, displacements, MPI_INT, obstacles, expected_cells, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Barrier(MPI_COMM_WORLD);
 
     //Calculate offsets
     int end = expected_cells - params.nx;
@@ -197,6 +198,8 @@ int main(int argc, char* argv[])
     //Calculate neighbour workers
     int down = (rank+1)%size;
     int up = (rank == 0) ? size-1 : rank-1; 
+
+    printf("Ready rank %d, out of %d\n", rank, size);
     //for(ii=0; ii< 5; ii++)
     for (ii = 0; ii < params.max_iters; ii++)
     {
@@ -255,11 +258,11 @@ int main(int argc, char* argv[])
 	  if(rank%2 == 0) {
 	    MPI_Send(&cells_odd[0], params.nx, MPI_SPEED_T, 
 		     up, 0, MPI_COMM_WORLD);
-	    MPI_Recv(&cells_odd[pad2-1], params.nx, MPI_SPEED_T, up, 0, 
+	    MPI_Recv(&cells_odd[pad2], params.nx, MPI_SPEED_T, up, 0, 
 		     MPI_COMM_WORLD, NULL);
-	    MPI_Send(&cells_odd[end-1], params.nx, MPI_SPEED_T, 
+	    MPI_Send(&cells_odd[end], params.nx, MPI_SPEED_T, 
 		     down, 0, MPI_COMM_WORLD);
-	    MPI_Recv(&cells_odd[pad1-1], params.nx, MPI_SPEED_T, down, 0, 
+	    MPI_Recv(&cells_odd[pad1], params.nx, MPI_SPEED_T, down, 0, 
 		     MPI_COMM_WORLD, NULL);
 	  }
 	  else {
