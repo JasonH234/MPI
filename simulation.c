@@ -82,9 +82,9 @@ float simulation_steps(const param_t params, speed_t* cells, const speed_t* old_
         {
 	    float tmp[NSPEEDS];
             int x_e,x_w,y_n,y_s;  /* indices of neighbouring cells */
-            y_n = (ii + 1) % params.ny+1;
+            y_n = (ii + 1) % (params.ny+1);
             x_e = (jj + 1) % params.nx;
-            y_s = (ii == 0) ? (ii + params.ny + 1) : (ii - 1);
+            y_s = (ii == 0) ? (ii + params.ny+1) : (ii - 1);
             x_w = (jj == 0) ? (jj + params.nx - 1) : (jj - 1);
 
             tmp[0]  = old_cells[ii*params.nx + jj].speeds[0]; /* central cell, */                                                     /* no movement   */
@@ -108,8 +108,7 @@ float simulation_steps(const param_t params, speed_t* cells, const speed_t* old_
                 cells[ii*params.nx + jj].speeds[7] = tmp[5];
                 cells[ii*params.nx + jj].speeds[8] = tmp[6];
 	      } 
-	    else
-	      {
+	    else {
 		const float local_density = tmp[0] + tmp[1] + tmp[2] + tmp[3] + tmp[4] + tmp[5] + tmp[6] + tmp[7] + tmp[8];
                 const float u_x = (tmp[1] +
                         tmp[5] +
@@ -152,6 +151,6 @@ float simulation_steps(const param_t params, speed_t* cells, const speed_t* old_
 	      }
         }
     }
-    return tot_u;
+    return tot_u / (float) params.tot_cells; 
 }
 
