@@ -101,7 +101,6 @@ int main(int argc, char* argv[])
     //Rank
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-    
       const int count = 8;
       int blocks[8] = {1,1,1,1,1,1,1,1};
       MPI_Aint offsets[8];
@@ -161,7 +160,7 @@ int main(int argc, char* argv[])
     int do_accel = 0;
     if(accel_area.col_or_row == ACCEL_ROW) {
       int low = rank * ((int) params.ny/size);
-      int high = (rank == (size-1)) ? params.ny : ((rank+1) * (int) params.ny/size);
+      int high = (rank == (size-1)) ? params.ny : ((rank+1) * ((int) params.ny/size));
       if(accel_area.idx >= low && accel_area.idx < high) {
 	    do_accel = 1;
 	    accel_area.idx -=low;
@@ -204,9 +203,10 @@ int main(int argc, char* argv[])
     {
     float av_vel;
     if(ii % 2 == 0) {
+
 	  if(do_accel)
 	     accelerate_flow(params, accel_area, cells_even, obstacles);
-	
+
 	  // only even send
 	  if(rank%2 == 0) {
 	    MPI_Send(&cells_even[0], params.nx, MPI_SPEED_T, 
@@ -261,7 +261,7 @@ int main(int argc, char* argv[])
 	}
 	//this could be moved to end
 	MPI_Reduce(&av_vel, &av_vels[ii], 1, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
-
+    //if(rank==0) printf("Av vel: %.12E\n", av_vels[ii]);
         #ifdef DEBUG
         printf("==timestep: %d==\n", ii);
         printf("av velocity: %.12E\n", av_vels[ii]);
