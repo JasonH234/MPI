@@ -139,9 +139,9 @@ int main(int argc, char* argv[])
       //set accel variables for broadcast
       idx = accel_area.idx;
       if(accel_area.col_or_row == ACCEL_ROW)
-	is_row = 1;
+	    is_row = 1;
       else
-	is_row = 0;
+	    is_row = 0;
 
       gettimeofday(&timstr,NULL);
       tic=timstr.tv_sec+(timstr.tv_usec/1000000.0);
@@ -160,17 +160,18 @@ int main(int argc, char* argv[])
 
     int do_accel = 0;
     if(accel_area.col_or_row == ACCEL_ROW) {
-      int low = rank * (int) params.ny/size;
-      int high = (rank+1) * (int) params.ny/size;
+      int low = rank * ((int) params.ny/size);
+      int high = (rank == (size-1)) ? params.ny : ((rank+1) * (int) params.ny/size);
       if(accel_area.idx >= low && accel_area.idx < high) {
-	do_accel = 1;
-	accel_area.idx -=low;
+	    do_accel = 1;
+	    accel_area.idx -=low;
       }
       
     }
 
     const int group_size = ((int)params.ny/size) * params.nx;
-    const int expected_cells = (rank == size-1) ? (params.ny%size) * params.nx + group_size : group_size;
+    const int remainder = (params.ny%size)*params.nx;
+    const int expected_cells = (rank == (size-1)) ? (remainder + group_size) : group_size;
     const int padding = 2 * params.nx;
 
     int group_sizes[size];
@@ -179,16 +180,16 @@ int main(int argc, char* argv[])
 	    group_sizes[ii] = group_size;
 	    displacements[ii] = (group_size) * ii; 
     }
-    group_sizes[size-1] += (params.ny%size)*params.nx; 
-    //send obstacles
+    group_sizes[size-1] = group_size + remainder;
 
     // save size of full grid before setting to cropped size
     int full_y = params.ny;
-    params.ny = (rank == size-1) ? (params.ny%size) + (int) params.ny/size : (int) params.ny/size;
+    params.ny = (rank == (size-1)) ? ((params.ny%size) + (int) params.ny/size) : ((int) params.ny/size);
     // allocate and initialise cells memory, with two rows padding
     initialise_worker(params, &cells_even, &cells_odd, &obstacles, expected_cells);
 
     MPI_Scatterv(obstacles_whole, group_sizes, displacements, MPI_INT, obstacles, expected_cells, MPI_INT, 0, MPI_COMM_WORLD);
+
     MPI_Barrier(MPI_COMM_WORLD);
 
     //Calculate offsets
@@ -199,11 +200,8 @@ int main(int argc, char* argv[])
     int down = (rank+1)%size;
     int up = (rank == 0) ? size-1 : rank-1; 
 
-    printf("Ready rank %d, out of %d\n", rank, size);
-    //for(ii=0; ii< 5; ii++)
     for (ii = 0; ii < params.max_iters; ii++)
     {
-
     float av_vel;
     if(ii % 2 == 0) {
 	  if(do_accel)
@@ -230,24 +228,7 @@ int main(int argc, char* argv[])
 	    MPI_Send(&cells_even[0], params.nx, MPI_SPEED_T, 
 		     up, 0, MPI_COMM_WORLD);
 	  }
-	  
-	  /*if(ii == 0) {
-	    int jj, kk;
-	    for (jj = 0; jj < params.ny+2; jj++) {
-	      for(kk = 0; kk < params.nx; kk++) {
-		if(cells_even[jj*params.nx+kk].speeds[0] != params.density * 4.0/9.0 ||
-		   cells_even[jj*params.nx+kk].speeds[1] != params.density /9.0 ||
-		   cells_even[jj*params.nx+kk].speeds[4] != params.density/9.0 ||
-		   cells_even[jj*params.nx+kk].speeds[5] != params.density /36.0 ||
-		   cells_even[jj*params.nx+kk].speeds[8] != params.density / 36.0) {
-		  printf("Rank: %d, found incorrect cell: %d, %d, value: %f, %f, %f, %f, %f\n", rank, jj, kk,
-			 cells_even[jj*params.nx+kk].speeds[0], cells_even[jj*params.nx+kk].speeds[1],
-			 cells_even[jj*params.nx+kk].speeds[4], cells_even[jj*params.nx+kk].speeds[5],
-			 cells_even[jj*params.nx+kk].speeds[8]);
-		}
-	      }
-	    }
-	  }*/
+
       MPI_Barrier(MPI_COMM_WORLD);
 	  av_vel = simulation_steps(params, cells_odd, cells_even, obstacles); 
 	}
@@ -280,8 +261,6 @@ int main(int argc, char* argv[])
 	}
 	//this could be moved to end
 	MPI_Reduce(&av_vel, &av_vels[ii], 1, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
-	//if(rank == 0) 
-		//printf("av velocity: %.12E\n", av_vels[ii]);
 
         #ifdef DEBUG
         printf("==timestep: %d==\n", ii);

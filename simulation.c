@@ -145,7 +145,7 @@ float simulation_steps(const param_t params, speed_t* cells, const speed_t* old_
 
                 for (kk = 0; kk < NSPEEDS; kk++)
                 {
-		  cells[ii*params.nx+jj].speeds[kk] = (tmp[kk]*omega_dif +d_equ[kk]);
+		             cells[ii*params.nx+jj].speeds[kk] = (tmp[kk]*omega_dif +d_equ[kk]);
                 }
                 tot_u += sqrt(u_sq);
 	      }
