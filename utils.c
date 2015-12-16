@@ -102,9 +102,9 @@ void initialise_worker(param_t params, speed_t** cells_even_ptr,
     *cells_odd_ptr = (speed_t*) malloc(sizeof(speed_t)*(expected_cells+2*params.nx));
     *obstacles_ptr = (int*) malloc(sizeof(int)*(expected_cells));
 
-    float w0 = params.density * 4.0/9.0;
-    float w1 = params.density      /9.0;
-    float w2 = params.density      /36.0;
+    float w0 = params.density * 4.0f/9.0f;
+    float w1 = params.density      /9.0f;
+    float w2 = params.density      /36.0f;
 
     int ii, jj;
     /* Initialise arrays */
@@ -131,9 +131,9 @@ void initialise_worker(param_t params, speed_t** cells_even_ptr,
 
 void initialise_unused(param_t params, speed_t** cells_ptr)
 {
-    float w0 = params.density * 4.0/9.0;
-    float w1 = params.density      /9.0;
-    float w2 = params.density      /36.0;
+    float w0 = params.density * 4.0f/9.0f;
+    float w1 = params.density      /9.0f;
+    float w2 = params.density      /36.0f;
 
     int ii, jj;
     /* Initialise arrays */

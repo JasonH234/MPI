@@ -9,6 +9,9 @@
 
 /* struct to hold the parameter values */
 typedef struct {
+    float density;       /* density per link */
+    float accel;         /* density redistribution */
+    float omega;         /* relaxation parameter */
     int nx;            /* no. of cells in x-direction */
     int ny;            /* no. of cells in y-direction */
     int max_iters;      /* no. of iterations */
@@ -18,9 +21,6 @@ typedef struct {
     int maxX;
     int minY;
     int maxY;
-    float density;       /* density per link */
-    float accel;         /* density redistribution */
-    float omega;         /* relaxation parameter */
 } param_t;
 
 /* obstacle positions */

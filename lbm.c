@@ -155,8 +155,6 @@ int main(int argc, char* argv[])
     MPI_Bcast(&is_row, 1, MPI_INT, 0, MPI_COMM_WORLD);
     
     const int croppedY = params.maxY - params.minY;
-    const char sendUp = ((rank == 0) && croppedY < params.ny) ? '0' : '1';
-    const char sendDown = ((rank == size-1) && croppedY < params.ny) ? '0' : '1';
 
     if(rank == 0)
         initialise_unused(params, &cells_whole);    
