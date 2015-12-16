@@ -181,8 +181,6 @@ int main(int argc, char* argv[])
 	    accel_area.idx -=low;
       }
     }
-    printf("%d, %d\n", do_accel, accel_area.idx);
-    
 
     // save size of full grid before setting to cropped size
     const int full_y = params.ny;
@@ -204,7 +202,8 @@ int main(int argc, char* argv[])
     MPI_Barrier(MPI_COMM_WORLD);
 
     //Calculate offsets
-    const int end = expected_cells - params.nx;
+    //const int start = ((rank == 0) && croppedY < full_y) ? expected_cells+params.nx : 0;
+    const int end = expected_cells - params.nx;//((rank == size-1) && croppedY < full_y) ? expected_cells : expected_cells - params.nx;
     const int pad1 = expected_cells;
     const int pad2 = expected_cells + params.nx;
     //Calculate neighbour workers
@@ -226,32 +225,24 @@ int main(int argc, char* argv[])
 
 	      // only even send
 	      if(rank%2 == 0) {
-            if(sendUp == '1') {
-	            MPI_Send(&cells_even[0], params.nx, MPI_SPEED_T, 
-		             up, 0, MPI_COMM_WORLD);
-	            MPI_Recv(&cells_even[pad2], params.nx, MPI_SPEED_T, up, 0, 
-		             MPI_COMM_WORLD, NULL);
-            }
-            if(sendDown == '1') {
-	            MPI_Send(&cells_even[end], params.nx, MPI_SPEED_T, 
-		             down, 0, MPI_COMM_WORLD);
-	            MPI_Recv(&cells_even[pad1], params.nx, MPI_SPEED_T, down, 0, 
-		             MPI_COMM_WORLD, NULL);
-            }
+            MPI_Send(&cells_even[0], params.nx, MPI_SPEED_T, 
+	             up, 0, MPI_COMM_WORLD);
+            MPI_Recv(&cells_even[pad2], params.nx, MPI_SPEED_T, up, 0, 
+	             MPI_COMM_WORLD, NULL);
+            MPI_Send(&cells_even[end], params.nx, MPI_SPEED_T, 
+	             down, 0, MPI_COMM_WORLD);
+            MPI_Recv(&cells_even[pad1], params.nx, MPI_SPEED_T, down, 0, 
+	             MPI_COMM_WORLD, NULL);
 	      }
 	      else {
-            if(sendDown == '1') {
-	            MPI_Recv(&cells_even[pad1], params.nx, MPI_SPEED_T, down, 0, 
-		             MPI_COMM_WORLD, NULL);
-	            MPI_Send(&cells_even[end], params.nx, MPI_SPEED_T, 
-		             down, 0, MPI_COMM_WORLD);
-            }
-            if(sendUp == '1') {
-	            MPI_Recv(&cells_even[pad2], params.nx, MPI_SPEED_T, up, 0, 
-		             MPI_COMM_WORLD, NULL);
-	            MPI_Send(&cells_even[0], params.nx, MPI_SPEED_T, 
-		             up, 0, MPI_COMM_WORLD);
-            }
+            MPI_Recv(&cells_even[pad1], params.nx, MPI_SPEED_T, down, 0, 
+	             MPI_COMM_WORLD, NULL);
+	        MPI_Send(&cells_even[end], params.nx, MPI_SPEED_T, 
+		        down, 0, MPI_COMM_WORLD);
+	        MPI_Recv(&cells_even[pad2], params.nx, MPI_SPEED_T, up, 0, 
+		         MPI_COMM_WORLD, NULL);
+	        MPI_Send(&cells_even[0], params.nx, MPI_SPEED_T, 
+		         up, 0, MPI_COMM_WORLD);
 	      }
 
           MPI_Barrier(MPI_COMM_WORLD);

@@ -53,6 +53,8 @@ void initialise(const char* paramfile, accel_area_t * accel_area,
 void initialise_worker(param_t params, speed_t** cells_even_ptr, 
 	speed_t** cells_odd_ptr, int** obstacles_ptr, const int expected_cells);
 
+void initialise_unused(param_t params, speed_t** cells_ptr);
+
 void write_values(const char * final_state_file, const char * av_vels_file,
     const param_t params, speed_t* cells, int* obstacles, float* av_vels);
 
