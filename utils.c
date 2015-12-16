@@ -317,15 +317,20 @@ void initialise(const char* param_file, accel_area_t * accel_area,
     free(obstacles);
 }
 
-void finalise(speed_t** cells_whole_ptr, speed_t** cells_ptr, speed_t** tmp_cells_ptr,
-	      int** obstacles_whole_ptr, int** obstacles_ptr, float** av_vels_ptr)
+void finalise(speed_t** cells_whole_ptr, int** obstacles_whole_ptr, float** av_vels_ptr)
 {
     /* Free allocated memory */
-  free(*cells_whole_ptr);
-    free(*cells_ptr);
-    free(*tmp_cells_ptr);
+    free(*cells_whole_ptr);
     free(*obstacles_whole_ptr);
-    free(*obstacles_ptr);
     free(*av_vels_ptr);
 }
+
+void finalise_worker(speed_t** cells_ptr, speed_t** tmp_cells_ptr, int** obstacles_ptr)
+{
+    /* Free allocated memory */
+    free(*cells_ptr);
+    free(*tmp_cells_ptr);
+    free(*obstacles_ptr);
+}
+
 

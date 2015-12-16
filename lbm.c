@@ -154,7 +154,7 @@ int main(int argc, char* argv[])
     MPI_Bcast(&idx, 1, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast(&is_row, 1, MPI_INT, 0, MPI_COMM_WORLD);
     
-    const int croppedY = params.maxY - params.minY +1;
+    const int croppedY = params.maxY - params.minY;
     const char sendUp = ((rank == 0) && croppedY < params.ny) ? '0' : '1';
     const char sendDown = ((rank == size-1) && croppedY < params.ny) ? '0' : '1';
 
@@ -316,8 +316,9 @@ int main(int argc, char* argv[])
       printf("Elapsed system CPU time:\t%.6f (s)\n", systim);
 
       write_values(final_state_file, av_vels_file, params, cells_whole, obstacles_whole, av_vels);
-      finalise(&cells_whole, &cells_even, &cells_odd, &obstacles_whole, &obstacles, &av_vels);
+      finalise(&cells_whole, &obstacles_whole, &av_vels);
     }
+    finalise_worker(&cells_even, &cells_odd, &obstacles);
     MPI_Finalize();
     return EXIT_SUCCESS;
 }
