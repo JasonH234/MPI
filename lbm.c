@@ -223,32 +223,27 @@ int main(int argc, char* argv[])
 
     for (ii = 0; ii < params.max_iters; ii++)
     {
-        float av_vel;
+        float av_vel =0.0f;
         if(ii % 2 == 0) {
 
 	      if(do_accel)
 	         accelerate_flow(params, accel_area, cells_even, obstacles);
 
-	      // only even send
 	      if(rank%2 == 0) {
-            MPI_Send(&cells_even[0], params.nx, MPI_SPEED_T, 
-	             up, 0, MPI_COMM_WORLD);
-            MPI_Recv(&cells_even[pad2], params.nx, MPI_SPEED_T, up, 0, 
-	             MPI_COMM_WORLD, NULL);
-            MPI_Send(&cells_even[end], params.nx, MPI_SPEED_T, 
-	             down, 0, MPI_COMM_WORLD);
-            MPI_Recv(&cells_even[pad1], params.nx, MPI_SPEED_T, down, 0, 
-	             MPI_COMM_WORLD, NULL);
+	        MPI_Sendrecv(&cells_even[0], params.nx, MPI_SPEED_T, up, 0,
+                         &cells_even[pad2], params.nx, MPI_SPEED_T, up, 0,
+                        MPI_COMM_WORLD, NULL);
+            MPI_Sendrecv(&cells_even[end], params.nx, MPI_SPEED_T, down, 0,
+                         &cells_even[pad1], params.nx, MPI_SPEED_T, down, 0,
+                        MPI_COMM_WORLD, NULL);
 	      }
 	      else {
-            MPI_Recv(&cells_even[pad1], params.nx, MPI_SPEED_T, down, 0, 
-	             MPI_COMM_WORLD, NULL);
-	        MPI_Send(&cells_even[end], params.nx, MPI_SPEED_T, 
-		        down, 0, MPI_COMM_WORLD);
-	        MPI_Recv(&cells_even[pad2], params.nx, MPI_SPEED_T, up, 0, 
-		         MPI_COMM_WORLD, NULL);
-	        MPI_Send(&cells_even[0], params.nx, MPI_SPEED_T, 
-		         up, 0, MPI_COMM_WORLD);
+	        MPI_Sendrecv(&cells_even[end], params.nx, MPI_SPEED_T, down, 0,
+                         &cells_even[pad1], params.nx, MPI_SPEED_T, down, 0,
+                        MPI_COMM_WORLD, NULL);
+            MPI_Sendrecv(&cells_even[0], params.nx, MPI_SPEED_T, up, 0,
+                         &cells_even[pad2], params.nx, MPI_SPEED_T, up, 0,
+                        MPI_COMM_WORLD, NULL);
 	      }
 
 	      av_vel = simulation_steps(&params, cells_odd, cells_even, obstacles); 
@@ -258,24 +253,20 @@ int main(int argc, char* argv[])
 	        accelerate_flow(params, accel_area, cells_odd, obstacles);
 	      
 	      if(rank%2 == 0) {
-	        MPI_Send(&cells_odd[0], params.nx, MPI_SPEED_T, 
-		         up, 0, MPI_COMM_WORLD);
-	        MPI_Recv(&cells_odd[pad2], params.nx, MPI_SPEED_T, up, 0, 
-		         MPI_COMM_WORLD, NULL);
-	        MPI_Send(&cells_odd[end], params.nx, MPI_SPEED_T, 
-		         down, 0, MPI_COMM_WORLD);
-	        MPI_Recv(&cells_odd[pad1], params.nx, MPI_SPEED_T, down, 0, 
-		         MPI_COMM_WORLD, NULL);
+	        MPI_Sendrecv(&cells_odd[0], params.nx, MPI_SPEED_T, up, 0,
+                         &cells_odd[pad2], params.nx, MPI_SPEED_T, up, 0,
+                        MPI_COMM_WORLD, NULL);
+            MPI_Sendrecv(&cells_odd[end], params.nx, MPI_SPEED_T, down, 0,
+                         &cells_odd[pad1], params.nx, MPI_SPEED_T, down, 0,
+                        MPI_COMM_WORLD, NULL);
 	      }
 	      else {
-	        MPI_Recv(&cells_odd[pad1], params.nx, MPI_SPEED_T, down, 0, 
-		         MPI_COMM_WORLD, NULL);
-	        MPI_Send(&cells_odd[end], params.nx, MPI_SPEED_T, 
-		         down, 0, MPI_COMM_WORLD);
-	        MPI_Recv(&cells_odd[pad2], params.nx, MPI_SPEED_T, up, 0, 
-		         MPI_COMM_WORLD, NULL);
-	        MPI_Send(&cells_odd[0], params.nx, MPI_SPEED_T, 
-		         up, 0, MPI_COMM_WORLD);
+	        MPI_Sendrecv(&cells_odd[end], params.nx, MPI_SPEED_T, down, 0,
+                         &cells_odd[pad1], params.nx, MPI_SPEED_T, down, 0,
+                        MPI_COMM_WORLD, NULL);
+            MPI_Sendrecv(&cells_odd[0], params.nx, MPI_SPEED_T, up, 0,
+                         &cells_odd[pad2], params.nx, MPI_SPEED_T, up, 0,
+                        MPI_COMM_WORLD, NULL);
 	      }
 	      av_vel = simulation_steps(&params, cells_even, cells_odd, obstacles);
 	    }
@@ -328,7 +319,7 @@ void write_values(const char * final_state_file, const char * av_vels_file,
 {
     FILE* fp;                     /* file pointer */
     int ii,jj,kk;                 /* generic counters */
-    const float c_sq = 1.0/3.0;  /* sq. of speed of sound */
+    const float c_sq = 1.0f/3.0f;  /* sq. of speed of sound */
     float local_density;         /* per grid cell sum of densities */
     float pressure;              /* fluid pressure in grid cell */
     float u_x;                   /* x-component of velocity in grid cell */
@@ -349,13 +340,13 @@ void write_values(const char * final_state_file, const char * av_vels_file,
             /* an occupied cell */
             if (obstacles[ii*params.nx + jj])
             {
-                u_x = u_y = u = 0.0;
+                u_x = u_y = u = 0.0f;
                 pressure = params.density * c_sq;
             }
             /* no obstacle */
             else
             {
-                local_density = 0.0;
+                local_density = 0.0f;
 
                 for (kk = 0; kk < NSPEEDS; kk++)
                 {
@@ -411,7 +402,7 @@ void write_values(const char * final_state_file, const char * av_vels_file,
 
 float calc_reynolds(const param_t params, const float av_vel)
 {
-    const float viscosity = 1.0 / 6.0 * (2.0 / params.omega - 1.0);
+    const float viscosity = 1.0f / 6.0f * (2.0f / params.omega - 1.0f);
 
     return av_vel * params.reynolds_dim / viscosity;
 }
@@ -419,7 +410,7 @@ float calc_reynolds(const param_t params, const float av_vel)
 float total_density(const param_t params, speed_t* cells)
 {
     int ii,jj,kk;        /* generic counters */
-    float total = 0.0;  /* accumulator */
+    float total = 0.0f;  /* accumulator */
 
     for (ii = 0; ii < params.ny; ii++)
     {
