@@ -181,6 +181,8 @@ int main(int argc, char* argv[])
 	    do_accel = 1;
 	    accel_area.idx -=low;
       }
+    } else {
+        do_accel = 1;
     }
 
     // save size of full grid before setting to cropped size
