@@ -162,10 +162,11 @@ int main(int argc, char* argv[])
         initialise_unused(params, &cells_whole);    
 
     const int group_size = ((int)croppedY/size) * params.nx;
+    const int remainderRows = (croppedY%size);
     const int remainder = (croppedY%size)*params.nx;
-    const int expected_cells = (rank == (size-1)) ? (remainder + group_size) : group_size;
+    const int expected_cells = (rank < remainderRows) ? (params.nx + group_size) : group_size;
     const int padding = 2 * params.nx;
-
+    //printf("%d, %d, %d\n", croppedY, (croppedY%size), expected_cells);
     if(rank > 0) {
       accel_area.idx = idx;
       accel_area.col_or_row = (is_row == 1) ? ACCEL_ROW : ACCEL_COLUMN;
@@ -173,8 +174,8 @@ int main(int argc, char* argv[])
 
     int do_accel = 0;
     if(accel_area.col_or_row == ACCEL_ROW) {
-      int low = rank * ((int) croppedY/size);
-      int high = (rank == (size-1)) ? croppedY : ((rank+1) * ((int) croppedY/size));
+      int low = (rank < remainderRows) ? rank * (((int) croppedY/size)+1) : rank * ((int) croppedY/size) + remainderRows;
+      int high = (rank < remainderRows) ? (rank+1) * (((int) croppedY/size)+1) : (rank+1) * ((int) croppedY/size) + remainderRows;
       accel_area.idx -= params.minY;
       if(accel_area.idx >= low && accel_area.idx < high) {
 	    do_accel = 1;
@@ -184,16 +185,21 @@ int main(int argc, char* argv[])
 
     // save size of full grid before setting to cropped size
     const int full_y = params.ny;
-    params.ny = (rank == (size-1)) ? ((croppedY%size) + (int) croppedY/size) : ((int) croppedY/size);
+    params.ny = (rank < remainderRows) ? 1 + ((int) croppedY/size) : ((int) croppedY/size);
 
     int group_sizes[size];
     int displacements[size];
     for (ii = 0; ii < size; ii++) {
 	    group_sizes[ii] = group_size;
 	    displacements[ii] = params.minY*params.nx +(group_size) * (ii); 
+
+        if(ii < remainderRows)  {
+            group_sizes[ii] += params.nx;
+            displacements[ii] += ii*params.nx;
+        }
+        else 
+            displacements[ii] += remainderRows*params.nx;
     }
-    group_sizes[size-1] = group_size + remainder;
-    
     // allocate and initialise cells memory, with two rows padding
     initialise_worker(params, &cells_even, &cells_odd, &obstacles, expected_cells);
 
@@ -245,7 +251,6 @@ int main(int argc, char* argv[])
 		         up, 0, MPI_COMM_WORLD);
 	      }
 
-          MPI_Barrier(MPI_COMM_WORLD);
 	      av_vel = simulation_steps(params, cells_odd, cells_even, obstacles); 
 	    }
 	    else {
@@ -272,7 +277,6 @@ int main(int argc, char* argv[])
 	        MPI_Send(&cells_odd[0], params.nx, MPI_SPEED_T, 
 		         up, 0, MPI_COMM_WORLD);
 	      }
-          MPI_Barrier(MPI_COMM_WORLD);
 	      av_vel = simulation_steps(params, cells_even, cells_odd, obstacles);
 	    }
 	    //this could be moved to end
