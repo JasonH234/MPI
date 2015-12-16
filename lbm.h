@@ -14,6 +14,10 @@ typedef struct {
     int max_iters;      /* no. of iterations */
     int tot_cells;
     int reynolds_dim;  /* dimension for Reynolds number */
+    int minX;
+    int maxX;
+    int minY;
+    int maxY;
     float density;       /* density per link */
     float accel;         /* density redistribution */
     float omega;         /* relaxation parameter */

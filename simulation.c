@@ -42,7 +42,7 @@ void accelerate_flow(const param_t params, const accel_area_t accel_area,
     {
         ii = accel_area.idx;
 
-        for (jj = 0; jj < params.nx; jj++)
+        for (jj = params.minX; jj < params.maxX; jj++)
         {
             /* if the cell is not occupied and
             ** we don't send a density negative */
@@ -78,7 +78,7 @@ float simulation_steps(const param_t params, speed_t* cells, const speed_t* old_
 
     for (ii = 0; ii < params.ny; ii++)
     {
-        for (jj = 0; jj < params.nx; jj++)
+        for (jj = params.minX; jj < params.maxX; jj++)
         {
 	    float tmp[NSPEEDS];
             int x_e,x_w,y_n,y_s;  /* indices of neighbouring cells */

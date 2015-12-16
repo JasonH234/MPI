@@ -129,6 +129,54 @@ void initialise_worker(param_t params, speed_t** cells_even_ptr,
 
 }
 
+void initialise_unused(param_t params, speed_t** cells_ptr)
+{
+    float w0 = params.density * 4.0/9.0;
+    float w1 = params.density      /9.0;
+    float w2 = params.density      /36.0;
+
+    int ii, jj;
+    /* Initialise arrays */
+    for (ii = 0; ii < params.minY; ii++)
+    {
+        for (jj = 0; jj < params.nx; jj++)
+        {
+            /* centre */
+            (*cells_ptr)[ii*params.nx + jj].speeds[0] = w0;
+            /* axis directions */
+            (*cells_ptr)[ii*params.nx + jj].speeds[1] = w1;
+            (*cells_ptr)[ii*params.nx + jj].speeds[2] = w1;
+            (*cells_ptr)[ii*params.nx + jj].speeds[3] = w1;
+            (*cells_ptr)[ii*params.nx + jj].speeds[4] = w1;
+            /* diagonals */
+            (*cells_ptr)[ii*params.nx + jj].speeds[5] = w2;
+            (*cells_ptr)[ii*params.nx + jj].speeds[6] = w2;
+            (*cells_ptr)[ii*params.nx + jj].speeds[7] = w2;
+            (*cells_ptr)[ii*params.nx + jj].speeds[8] = w2;
+        }
+    }
+    for (ii = params.maxY; ii < params.ny; ii++)
+    {
+        for (jj = 0; jj < params.nx; jj++)
+        {
+            /* centre */
+            (*cells_ptr)[ii*params.nx + jj].speeds[0] = w0;
+            /* axis directions */
+            (*cells_ptr)[ii*params.nx + jj].speeds[1] = w1;
+            (*cells_ptr)[ii*params.nx + jj].speeds[2] = w1;
+            (*cells_ptr)[ii*params.nx + jj].speeds[3] = w1;
+            (*cells_ptr)[ii*params.nx + jj].speeds[4] = w1;
+            /* diagonals */
+            (*cells_ptr)[ii*params.nx + jj].speeds[5] = w2;
+            (*cells_ptr)[ii*params.nx + jj].speeds[6] = w2;
+            (*cells_ptr)[ii*params.nx + jj].speeds[7] = w2;
+            (*cells_ptr)[ii*params.nx + jj].speeds[8] = w2;
+        }
+    }
+
+
+}
+
 void initialise(const char* param_file, accel_area_t * accel_area,
     param_t* params, speed_t** cells_ptr,
     int** obstacles_ptr, float** av_vels_ptr)
@@ -226,6 +274,7 @@ void initialise(const char* param_file, accel_area_t * accel_area,
     // initialise total cells to 0
     params->tot_cells = 0;
     /* Fill in locations of obstacles */
+    int minX=-1,minY=-1, maxX=-1,maxY=-1;
     for (ii = 0; ii < params->ny; ii++)
     {
         for (jj = 0; jj < params->nx; jj++)
@@ -245,12 +294,25 @@ void initialise(const char* param_file, accel_area_t * accel_area,
 		  (*obstacles_ptr)[ii*params->nx + jj] = 1;		  
                 }
             }
-	    // if cell is not an obstacle, increment total cell count.
-	    if((*obstacles_ptr)[ii*params->nx +jj] == 0) {
-		  params->tot_cells ++;
-	    }
+	        // if cell is not an obstacle, increment total cell count and consider bounds
+	        if((*obstacles_ptr)[ii*params->nx +jj] == 0) {
+		      params->tot_cells ++;
+                if(minX > jj || minX == -1)
+                    minX = jj;
+                if(maxX < jj || maxX == -1)
+                    maxX = jj;
+                if(minY > ii || minY == -1)
+                    minY = ii;
+                if(maxY < ii || maxY == -1)
+                    maxY = ii;
+	        }
         }
     }
+
+    params->minX = (minX -1 > 0) ? minX-2 : 0;
+    params->maxX = (maxX +1 < params->nx) ? maxX +2 : params->nx;
+    params->minY = (minY -1 > 0) ? minY-2 : 0;
+    params->maxY = (maxY +1 < params->ny) ? maxY +2 : params->ny;
 
     free(obstacles);
 }

@@ -101,19 +101,24 @@ int main(int argc, char* argv[])
     //Rank
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-      const int count = 8;
-      int blocks[8] = {1,1,1,1,1,1,1,1};
-      MPI_Aint offsets[8];
+      const int count = 12;
+      int blocks[12] = {1,1,1,1,1,1,1,1,1,1,1,1};
+      MPI_Aint offsets[12];
       offsets[0] = offsetof(param_t, nx);
       offsets[1] = offsetof(param_t, ny);
       offsets[2] = offsetof(param_t, max_iters);
       offsets[3] = offsetof(param_t, tot_cells);
       offsets[4] = offsetof(param_t, reynolds_dim);
-      offsets[5] = offsetof(param_t, density);
-      offsets[6] = offsetof(param_t, accel);
-      offsets[7] = offsetof(param_t, omega);
-      MPI_Datatype types[8] = {MPI_INT, MPI_INT, MPI_INT, MPI_INT, MPI_INT,
-			       MPI_FLOAT, MPI_FLOAT, MPI_FLOAT};
+      offsets[5] = offsetof(param_t, minX);
+      offsets[6] = offsetof(param_t, maxX);
+      offsets[7] = offsetof(param_t, minY);
+      offsets[8] = offsetof(param_t, maxY);
+      offsets[9] = offsetof(param_t, density);
+      offsets[10] = offsetof(param_t, accel);
+      offsets[11] = offsetof(param_t, omega);
+      MPI_Datatype types[12] = {MPI_INT, MPI_INT, MPI_INT, MPI_INT, MPI_INT,
+                               MPI_INT, MPI_INT, MPI_INT, MPI_INT,
+			                    MPI_FLOAT, MPI_FLOAT, MPI_FLOAT};
       MPI_Datatype MPI_PARAM_T;
       MPI_Type_create_struct(count, blocks, offsets, types, &MPI_PARAM_T);
       MPI_Type_commit(&MPI_PARAM_T);
@@ -142,15 +147,22 @@ int main(int argc, char* argv[])
       else
 	    is_row = 0;
 
-      gettimeofday(&timstr,NULL);
-      tic=timstr.tv_sec+(timstr.tv_usec/1000000.0);
-
     }
     // share params
     MPI_Bcast(&params, 1, MPI_PARAM_T, 0, MPI_COMM_WORLD);
     
     MPI_Bcast(&idx, 1, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast(&is_row, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    
+    const int croppedY = params.maxY - params.minY +1;
+
+    if(rank == 0)
+        initialise_unused(params, &cells_whole);    
+
+    const int group_size = ((int)croppedY/size) * params.nx;
+    const int remainder = (croppedY%size)*params.nx;
+    const int expected_cells = (rank == (size-1)) ? (remainder + group_size) : group_size;
+    const int padding = 2 * params.nx;
 
     if(rank > 0) {
       accel_area.idx = idx;
@@ -159,31 +171,27 @@ int main(int argc, char* argv[])
 
     int do_accel = 0;
     if(accel_area.col_or_row == ACCEL_ROW) {
-      int low = rank * ((int) params.ny/size);
-      int high = (rank == (size-1)) ? params.ny : ((rank+1) * ((int) params.ny/size));
+      int low = rank * ((int) croppedY/size);
+      int high = (rank == (size-1)) ? croppedY : ((rank+1) * ((int) croppedY/size));
       if(accel_area.idx >= low && accel_area.idx < high) {
 	    do_accel = 1;
 	    accel_area.idx -=low;
       }
-      
     }
 
-    const int group_size = ((int)params.ny/size) * params.nx;
-    const int remainder = (params.ny%size)*params.nx;
-    const int expected_cells = (rank == (size-1)) ? (remainder + group_size) : group_size;
-    const int padding = 2 * params.nx;
+    // save size of full grid before setting to cropped size
+    const int full_y = params.ny;
+    params.ny = (rank == (size-1)) ? ((croppedY%size) + (int) croppedY/size) : ((int) croppedY/size);
 
     int group_sizes[size];
     int displacements[size];
     for (ii = 0; ii < size; ii++) {
 	    group_sizes[ii] = group_size;
-	    displacements[ii] = (group_size) * ii; 
+	    displacements[ii] = params.minY*params.nx +(group_size) * (ii); 
+        printf("%d\n", displacements[ii]);
     }
     group_sizes[size-1] = group_size + remainder;
-
-    // save size of full grid before setting to cropped size
-    int full_y = params.ny;
-    params.ny = (rank == (size-1)) ? ((params.ny%size) + (int) params.ny/size) : ((int) params.ny/size);
+    
     // allocate and initialise cells memory, with two rows padding
     initialise_worker(params, &cells_even, &cells_odd, &obstacles, expected_cells);
 
@@ -192,81 +200,86 @@ int main(int argc, char* argv[])
     MPI_Barrier(MPI_COMM_WORLD);
 
     //Calculate offsets
-    int end = expected_cells - params.nx;
-    int pad1 = expected_cells;
-    int pad2 = expected_cells + params.nx;
+    const int end = expected_cells - params.nx;
+    const int pad1 = expected_cells;
+    const int pad2 = expected_cells + params.nx;
     //Calculate neighbour workers
-    int down = (rank+1)%size;
-    int up = (rank == 0) ? size-1 : rank-1; 
+    const int down = (rank+1)%size;
+    const int up = (rank == 0) ? size-1 : rank-1; 
+
+    if(rank == 0) {
+        gettimeofday(&timstr,NULL);
+        tic=timstr.tv_sec+(timstr.tv_usec/1000000.0);
+    }
 
     for (ii = 0; ii < params.max_iters; ii++)
     {
-    float av_vel;
-    if(ii % 2 == 0) {
+        float av_vel;
+        if(ii % 2 == 0) {
 
-	  if(do_accel)
-	     accelerate_flow(params, accel_area, cells_even, obstacles);
+	      if(do_accel)
+	         accelerate_flow(params, accel_area, cells_even, obstacles);
 
-	  // only even send
-	  if(rank%2 == 0) {
-	    MPI_Send(&cells_even[0], params.nx, MPI_SPEED_T, 
-		     up, 0, MPI_COMM_WORLD);
-	    MPI_Recv(&cells_even[pad2], params.nx, MPI_SPEED_T, up, 0, 
-		     MPI_COMM_WORLD, NULL);
-	    MPI_Send(&cells_even[end], params.nx, MPI_SPEED_T, 
-		     down, 0, MPI_COMM_WORLD);
-	    MPI_Recv(&cells_even[pad1], params.nx, MPI_SPEED_T, down, 0, 
-		     MPI_COMM_WORLD, NULL);
-	  }
-	  else {
-	    MPI_Recv(&cells_even[pad1], params.nx, MPI_SPEED_T, down, 0, 
-		     MPI_COMM_WORLD, NULL);
-	    MPI_Send(&cells_even[end], params.nx, MPI_SPEED_T, 
-		     down, 0, MPI_COMM_WORLD);
-	    MPI_Recv(&cells_even[pad2], params.nx, MPI_SPEED_T, up, 0, 
-		     MPI_COMM_WORLD, NULL);
-	    MPI_Send(&cells_even[0], params.nx, MPI_SPEED_T, 
-		     up, 0, MPI_COMM_WORLD);
-	  }
+	      // only even send
+	      if(rank%2 == 0) {
+	        MPI_Send(&cells_even[0], params.nx, MPI_SPEED_T, 
+		         up, 0, MPI_COMM_WORLD);
+	        MPI_Recv(&cells_even[pad2], params.nx, MPI_SPEED_T, up, 0, 
+		         MPI_COMM_WORLD, NULL);
+	        MPI_Send(&cells_even[end], params.nx, MPI_SPEED_T, 
+		         down, 0, MPI_COMM_WORLD);
+	        MPI_Recv(&cells_even[pad1], params.nx, MPI_SPEED_T, down, 0, 
+		         MPI_COMM_WORLD, NULL);
+	      }
+	      else {
+	        MPI_Recv(&cells_even[pad1], params.nx, MPI_SPEED_T, down, 0, 
+		         MPI_COMM_WORLD, NULL);
+	        MPI_Send(&cells_even[end], params.nx, MPI_SPEED_T, 
+		         down, 0, MPI_COMM_WORLD);
+	        MPI_Recv(&cells_even[pad2], params.nx, MPI_SPEED_T, up, 0, 
+		         MPI_COMM_WORLD, NULL);
+	        MPI_Send(&cells_even[0], params.nx, MPI_SPEED_T, 
+		         up, 0, MPI_COMM_WORLD);
+	      }
 
-      MPI_Barrier(MPI_COMM_WORLD);
-	  av_vel = simulation_steps(params, cells_odd, cells_even, obstacles); 
-	}
-	else {
-	  if(do_accel)
-	    accelerate_flow(params, accel_area, cells_odd, obstacles);
-	  
-	  if(rank%2 == 0) {
-	    MPI_Send(&cells_odd[0], params.nx, MPI_SPEED_T, 
-		     up, 0, MPI_COMM_WORLD);
-	    MPI_Recv(&cells_odd[pad2], params.nx, MPI_SPEED_T, up, 0, 
-		     MPI_COMM_WORLD, NULL);
-	    MPI_Send(&cells_odd[end], params.nx, MPI_SPEED_T, 
-		     down, 0, MPI_COMM_WORLD);
-	    MPI_Recv(&cells_odd[pad1], params.nx, MPI_SPEED_T, down, 0, 
-		     MPI_COMM_WORLD, NULL);
-	  }
-	  else {
-	    MPI_Recv(&cells_odd[pad1], params.nx, MPI_SPEED_T, down, 0, 
-		     MPI_COMM_WORLD, NULL);
-	    MPI_Send(&cells_odd[end], params.nx, MPI_SPEED_T, 
-		     down, 0, MPI_COMM_WORLD);
-	    MPI_Recv(&cells_odd[pad2], params.nx, MPI_SPEED_T, up, 0, 
-		     MPI_COMM_WORLD, NULL);
-	    MPI_Send(&cells_odd[0], params.nx, MPI_SPEED_T, 
-		     up, 0, MPI_COMM_WORLD);
-	  }
-      MPI_Barrier(MPI_COMM_WORLD);
-	  av_vel = simulation_steps(params, cells_even, cells_odd, obstacles);
-	}
-	//this could be moved to end
-	MPI_Reduce(&av_vel, &av_vels[ii], 1, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
-    //if(rank==0) printf("Av vel: %.12E\n", av_vels[ii]);
-        #ifdef DEBUG
-        printf("==timestep: %d==\n", ii);
-        printf("av velocity: %.12E\n", av_vels[ii]);
-        printf("tot density: %.12E\n", total_density(params, cells_even));
-        #endif
+          MPI_Barrier(MPI_COMM_WORLD);
+	      av_vel = simulation_steps(params, cells_odd, cells_even, obstacles); 
+	    }
+	    else {
+	      if(do_accel)
+	        accelerate_flow(params, accel_area, cells_odd, obstacles);
+	      
+	      if(rank%2 == 0) {
+	        MPI_Send(&cells_odd[0], params.nx, MPI_SPEED_T, 
+		         up, 0, MPI_COMM_WORLD);
+	        MPI_Recv(&cells_odd[pad2], params.nx, MPI_SPEED_T, up, 0, 
+		         MPI_COMM_WORLD, NULL);
+	        MPI_Send(&cells_odd[end], params.nx, MPI_SPEED_T, 
+		         down, 0, MPI_COMM_WORLD);
+	        MPI_Recv(&cells_odd[pad1], params.nx, MPI_SPEED_T, down, 0, 
+		         MPI_COMM_WORLD, NULL);
+	      }
+	      else {
+	        MPI_Recv(&cells_odd[pad1], params.nx, MPI_SPEED_T, down, 0, 
+		         MPI_COMM_WORLD, NULL);
+	        MPI_Send(&cells_odd[end], params.nx, MPI_SPEED_T, 
+		         down, 0, MPI_COMM_WORLD);
+	        MPI_Recv(&cells_odd[pad2], params.nx, MPI_SPEED_T, up, 0, 
+		         MPI_COMM_WORLD, NULL);
+	        MPI_Send(&cells_odd[0], params.nx, MPI_SPEED_T, 
+		         up, 0, MPI_COMM_WORLD);
+	      }
+          MPI_Barrier(MPI_COMM_WORLD);
+	      av_vel = simulation_steps(params, cells_even, cells_odd, obstacles);
+	    }
+	    //this could be moved to end
+	    MPI_Reduce(&av_vel, &av_vels[ii], 1, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
+        //if(rank==0) printf("Av vel: %.12E\n", av_vels[ii]);
+            #ifdef DEBUG
+            printf("==timestep: %d==\n", ii);
+            printf("av velocity: %.12E\n", av_vels[ii]);
+            printf("tot density: %.12E\n", total_density(params, cells_even));
+            #endif
     }
 
     //Restore full grid
