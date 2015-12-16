@@ -229,21 +229,26 @@ int main(int argc, char* argv[])
 	      if(do_accel)
 	         accelerate_flow(params, accel_area, cells_even, obstacles);
 
+	      // only even send
 	      if(rank%2 == 0) {
-	        MPI_Sendrecv(&cells_even[0], params.nx, MPI_SPEED_T, up, 0,
-                         &cells_even[pad2], params.nx, MPI_SPEED_T, up, 0,
-                        MPI_COMM_WORLD, NULL);
-            MPI_Sendrecv(&cells_even[end], params.nx, MPI_SPEED_T, down, 0,
-                         &cells_even[pad1], params.nx, MPI_SPEED_T, down, 0,
-                        MPI_COMM_WORLD, NULL);
+            MPI_Send(&cells_even[0], params.nx, MPI_SPEED_T, 
+	             up, 0, MPI_COMM_WORLD);
+            MPI_Recv(&cells_even[pad2], params.nx, MPI_SPEED_T, up, 0, 
+	             MPI_COMM_WORLD, NULL);
+            MPI_Send(&cells_even[end], params.nx, MPI_SPEED_T, 
+	             down, 0, MPI_COMM_WORLD);
+            MPI_Recv(&cells_even[pad1], params.nx, MPI_SPEED_T, down, 0, 
+	             MPI_COMM_WORLD, NULL);
 	      }
 	      else {
-	        MPI_Sendrecv(&cells_even[end], params.nx, MPI_SPEED_T, down, 0,
-                         &cells_even[pad1], params.nx, MPI_SPEED_T, down, 0,
-                        MPI_COMM_WORLD, NULL);
-            MPI_Sendrecv(&cells_even[0], params.nx, MPI_SPEED_T, up, 0,
-                         &cells_even[pad2], params.nx, MPI_SPEED_T, up, 0,
-                        MPI_COMM_WORLD, NULL);
+            MPI_Recv(&cells_even[pad1], params.nx, MPI_SPEED_T, down, 0, 
+	             MPI_COMM_WORLD, NULL);
+	        MPI_Send(&cells_even[end], params.nx, MPI_SPEED_T, 
+		        down, 0, MPI_COMM_WORLD);
+	        MPI_Recv(&cells_even[pad2], params.nx, MPI_SPEED_T, up, 0, 
+		         MPI_COMM_WORLD, NULL);
+	        MPI_Send(&cells_even[0], params.nx, MPI_SPEED_T, 
+		         up, 0, MPI_COMM_WORLD);
 	      }
 
 	      av_vel = simulation_steps(&params, cells_odd, cells_even, obstacles); 
@@ -253,20 +258,24 @@ int main(int argc, char* argv[])
 	        accelerate_flow(params, accel_area, cells_odd, obstacles);
 	      
 	      if(rank%2 == 0) {
-	        MPI_Sendrecv(&cells_odd[0], params.nx, MPI_SPEED_T, up, 0,
-                         &cells_odd[pad2], params.nx, MPI_SPEED_T, up, 0,
-                        MPI_COMM_WORLD, NULL);
-            MPI_Sendrecv(&cells_odd[end], params.nx, MPI_SPEED_T, down, 0,
-                         &cells_odd[pad1], params.nx, MPI_SPEED_T, down, 0,
-                        MPI_COMM_WORLD, NULL);
+	        MPI_Send(&cells_odd[0], params.nx, MPI_SPEED_T, 
+		         up, 0, MPI_COMM_WORLD);
+	        MPI_Recv(&cells_odd[pad2], params.nx, MPI_SPEED_T, up, 0, 
+		         MPI_COMM_WORLD, NULL);
+	        MPI_Send(&cells_odd[end], params.nx, MPI_SPEED_T, 
+		         down, 0, MPI_COMM_WORLD);
+	        MPI_Recv(&cells_odd[pad1], params.nx, MPI_SPEED_T, down, 0, 
+		         MPI_COMM_WORLD, NULL);
 	      }
 	      else {
-	        MPI_Sendrecv(&cells_odd[end], params.nx, MPI_SPEED_T, down, 0,
-                         &cells_odd[pad1], params.nx, MPI_SPEED_T, down, 0,
-                        MPI_COMM_WORLD, NULL);
-            MPI_Sendrecv(&cells_odd[0], params.nx, MPI_SPEED_T, up, 0,
-                         &cells_odd[pad2], params.nx, MPI_SPEED_T, up, 0,
-                        MPI_COMM_WORLD, NULL);
+	        MPI_Recv(&cells_odd[pad1], params.nx, MPI_SPEED_T, down, 0, 
+		         MPI_COMM_WORLD, NULL);
+	        MPI_Send(&cells_odd[end], params.nx, MPI_SPEED_T, 
+		         down, 0, MPI_COMM_WORLD);
+	        MPI_Recv(&cells_odd[pad2], params.nx, MPI_SPEED_T, up, 0, 
+		         MPI_COMM_WORLD, NULL);
+	        MPI_Send(&cells_odd[0], params.nx, MPI_SPEED_T, 
+		         up, 0, MPI_COMM_WORLD);
 	      }
 	      av_vel = simulation_steps(&params, cells_even, cells_odd, obstacles);
 	    }
