@@ -48,34 +48,28 @@ void parse_args (int argc, char* argv[],
 
 void initialise(const char* paramfile, accel_area_t * accel_area,
     param_t* params, speed_t** cells_ptr,
-    int** obstacles_ptr, float** av_vels_ptr);
+    unsigned int** obstacles_ptr, float** av_vels_ptr);
 
 void initialise_worker(param_t params, speed_t** cells_even_ptr, 
-	speed_t** cells_odd_ptr, int** obstacles_ptr, const int expected_cells);
+	speed_t** cells_odd_ptr, unsigned int** obstacles_ptr, const int expected_cells);
 
 void initialise_unused(param_t params, speed_t** cells_ptr);
 
 void write_values(const char * final_state_file, const char * av_vels_file,
-    const param_t params, speed_t* cells, int* obstacles, float* av_vels);
+    const param_t params, speed_t* cells, const unsigned int* obstacles, float* av_vels);
 
-void finalise(speed_t** cells_whole_ptr, int** obstacles_whole_ptr, float** av_vels_ptr);
-void finalise_worker(speed_t** cells_ptr, speed_t** tmp_cells_ptr, int** obstacles_ptr);
+void finalise(speed_t** cells_whole_ptr, unsigned int** obstacles_whole_ptr, float** av_vels_ptr);
+void finalise_worker(speed_t** cells_ptr, speed_t** tmp_cells_ptr, unsigned int** obstacles_ptr);
 
-void timestep(const param_t params, const accel_area_t accel_area,
-    speed_t* cells, speed_t* tmp_cells, int* obstacles);
 void accelerate_flow(const param_t params, const accel_area_t accel_area,
-    speed_t* cells, int* obstacles);
-void propagate(const param_t params, speed_t* cells, speed_t* tmp_cells);
-void rebound(const param_t params, speed_t* cells, speed_t* tmp_cells, int* obstacles);
-void collision(const param_t params, speed_t* cells, speed_t* tmp_cells, int* obstacles);
+    speed_t* cells, const unsigned int* obstacles);
+
 void copy_cells(const param_t params, speed_t* cells1, speed_t* cells2);
-float simulation_steps(const param_t params, speed_t* cells, const speed_t* old_cells, int* obstacles);
+float simulation_steps(const param_t *params, speed_t* cells, const speed_t* old_cells, const unsigned int* obstacles);
 /* Sum all the densities in the grid.
 ** The total should remain constant from one timestep to the next. */
 float total_density(const param_t params, speed_t* cells);
 
-/* compute average velocity */
-float av_velocity(const param_t params, speed_t* cells, int* obstacles);
 
 /* calculate Reynolds number */
 float calc_reynolds(const param_t params, const float av_vel);

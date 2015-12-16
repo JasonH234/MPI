@@ -96,7 +96,7 @@ void parse_args (int argc, char* argv[],
 
 
 void initialise_worker(param_t params, speed_t** cells_even_ptr, 
-	speed_t** cells_odd_ptr, int** obstacles_ptr, const int expected_cells)
+	speed_t** cells_odd_ptr, unsigned int** obstacles_ptr, const int expected_cells)
 {
     *cells_even_ptr = (speed_t*) malloc(sizeof(speed_t)*(expected_cells+2*params.nx));
     *cells_odd_ptr = (speed_t*) malloc(sizeof(speed_t)*(expected_cells+2*params.nx));
@@ -179,7 +179,7 @@ void initialise_unused(param_t params, speed_t** cells_ptr)
 
 void initialise(const char* param_file, accel_area_t * accel_area,
     param_t* params, speed_t** cells_ptr,
-    int** obstacles_ptr, float** av_vels_ptr)
+    unsigned int** obstacles_ptr, float** av_vels_ptr)
 {
     FILE   *fp;            /* file pointer */
     int    ii,jj, kk;          /* generic counters */
@@ -317,7 +317,7 @@ void initialise(const char* param_file, accel_area_t * accel_area,
     free(obstacles);
 }
 
-void finalise(speed_t** cells_whole_ptr, int** obstacles_whole_ptr, float** av_vels_ptr)
+void finalise(speed_t** cells_whole_ptr, unsigned int** obstacles_whole_ptr, float** av_vels_ptr)
 {
     /* Free allocated memory */
     free(*cells_whole_ptr);
@@ -325,7 +325,7 @@ void finalise(speed_t** cells_whole_ptr, int** obstacles_whole_ptr, float** av_v
     free(*av_vels_ptr);
 }
 
-void finalise_worker(speed_t** cells_ptr, speed_t** tmp_cells_ptr, int** obstacles_ptr)
+void finalise_worker(speed_t** cells_ptr, speed_t** tmp_cells_ptr, unsigned int** obstacles_ptr)
 {
     /* Free allocated memory */
     free(*cells_ptr);

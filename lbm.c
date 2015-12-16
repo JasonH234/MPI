@@ -75,8 +75,8 @@ int main(int argc, char* argv[])
     speed_t* cells_whole = NULL;
     speed_t* cells_even = NULL;    /* grid containing fluid densities */
     speed_t* cells_odd = NULL;
-    int*     obstacles_whole = NULL;    /* grid indicating which cells are blocked */
-    int* obstacles = NULL;
+    unsigned int*     obstacles_whole = NULL;    /* grid indicating which cells are blocked */
+    unsigned int* obstacles = NULL;
     float*  av_vels   = NULL;    /* a record of the av. velocity computed for each timestep */
 
     int    ii;                    /*  generic counter */
@@ -101,8 +101,8 @@ int main(int argc, char* argv[])
     //Rank
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-      const int count = 12;
-      int blocks[12] = {1,1,1,1,1,1,1,1,1,1,1,1};
+      const unsigned int count = 12;
+      unsigned int blocks[12] = {1,1,1,1,1,1,1,1,1,1,1,1};
       MPI_Aint offsets[12];
       offsets[0] = offsetof(param_t, nx);
       offsets[1] = offsetof(param_t, ny);
@@ -123,8 +123,8 @@ int main(int argc, char* argv[])
       MPI_Type_create_struct(count, blocks, offsets, types, &MPI_PARAM_T);
       MPI_Type_commit(&MPI_PARAM_T);
 
-      const int cell_count = 1;
-      int cell_blocks[1] = {NSPEEDS};
+      const unsigned int cell_count = 1;
+      unsigned int cell_blocks[1] = {NSPEEDS};
       MPI_Aint cell_offsets[1] ={offsetof(speed_t, speeds)};
       MPI_Datatype cell_types[1] = {MPI_FLOAT};
       MPI_Datatype MPI_SPEED_T;
@@ -132,8 +132,8 @@ int main(int argc, char* argv[])
       MPI_Type_commit(&MPI_SPEED_T);
 
       // accel variables
-    int idx;
-    int is_row;
+    unsigned int idx;
+    unsigned int is_row;
 
     // master initialise
     if(rank == 0) {
@@ -154,26 +154,26 @@ int main(int argc, char* argv[])
     MPI_Bcast(&idx, 1, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast(&is_row, 1, MPI_INT, 0, MPI_COMM_WORLD);
     
-    const int croppedY = params.maxY - params.minY;
+    const unsigned int croppedY = params.maxY - params.minY;
 
     if(rank == 0)
         initialise_unused(params, &cells_whole);    
 
-    const int group_size = ((int)croppedY/size) * params.nx;
-    const int remainderRows = (croppedY%size);
-    const int remainder = (croppedY%size)*params.nx;
-    const int expected_cells = (rank < remainderRows) ? (params.nx + group_size) : group_size;
-    const int padding = 2 * params.nx;
+    const unsigned int group_size = ((int)croppedY/size) * params.nx;
+    const unsigned int remainderRows = (croppedY%size);
+    const unsigned int remainder = (croppedY%size)*params.nx;
+    const unsigned int expected_cells = (rank < remainderRows) ? (params.nx + group_size) : group_size;
+    const unsigned int padding = 2 * params.nx;
     //printf("%d, %d, %d\n", croppedY, (croppedY%size), expected_cells);
     if(rank > 0) {
       accel_area.idx = idx;
       accel_area.col_or_row = (is_row == 1) ? ACCEL_ROW : ACCEL_COLUMN;
     }
 
-    int do_accel = 0;
+    unsigned int do_accel = 0;
     if(accel_area.col_or_row == ACCEL_ROW) {
-      int low = (rank < remainderRows) ? rank * (((int) croppedY/size)+1) : rank * ((int) croppedY/size) + remainderRows;
-      int high = (rank < remainderRows) ? (rank+1) * (((int) croppedY/size)+1) : (rank+1) * ((int) croppedY/size) + remainderRows;
+      unsigned int low = (rank < remainderRows) ? rank * (((int) croppedY/size)+1) : rank * ((int) croppedY/size) + remainderRows;
+      unsigned int high = (rank < remainderRows) ? (rank+1) * (((int) croppedY/size)+1) : (rank+1) * ((int) croppedY/size) + remainderRows;
       accel_area.idx -= params.minY;
       if(accel_area.idx >= low && accel_area.idx < high) {
 	    do_accel = 1;
@@ -184,11 +184,11 @@ int main(int argc, char* argv[])
     }
 
     // save size of full grid before setting to cropped size
-    const int full_y = params.ny;
+    const unsigned int full_y = params.ny;
     params.ny = (rank < remainderRows) ? 1 + ((int) croppedY/size) : ((int) croppedY/size);
 
-    int group_sizes[size];
-    int displacements[size];
+    unsigned int group_sizes[size];
+    unsigned int displacements[size];
     for (ii = 0; ii < size; ii++) {
 	    group_sizes[ii] = group_size;
 	    displacements[ii] = params.minY*params.nx +(group_size) * (ii); 
@@ -209,12 +209,12 @@ int main(int argc, char* argv[])
 
     //Calculate offsets
     //const int start = ((rank == 0) && croppedY < full_y) ? expected_cells+params.nx : 0;
-    const int end = expected_cells - params.nx;//((rank == size-1) && croppedY < full_y) ? expected_cells : expected_cells - params.nx;
-    const int pad1 = expected_cells;
-    const int pad2 = expected_cells + params.nx;
+    const unsigned int end = expected_cells - params.nx;//((rank == size-1) && croppedY < full_y) ? expected_cells : expected_cells - params.nx;
+    const unsigned int pad1 = expected_cells;
+    const unsigned int pad2 = expected_cells + params.nx;
     //Calculate neighbour workers
-    const int down = (rank+1)%size;
-    const int up = (rank == 0) ? size-1 : rank-1; 
+    const unsigned int down = (rank+1)%size;
+    const unsigned int up = (rank == 0) ? size-1 : rank-1; 
 
     if(rank == 0) {
         gettimeofday(&timstr,NULL);
@@ -251,7 +251,7 @@ int main(int argc, char* argv[])
 		         up, 0, MPI_COMM_WORLD);
 	      }
 
-	      av_vel = simulation_steps(params, cells_odd, cells_even, obstacles); 
+	      av_vel = simulation_steps(&params, cells_odd, cells_even, obstacles); 
 	    }
 	    else {
 	      if(do_accel)
@@ -277,7 +277,7 @@ int main(int argc, char* argv[])
 	        MPI_Send(&cells_odd[0], params.nx, MPI_SPEED_T, 
 		         up, 0, MPI_COMM_WORLD);
 	      }
-	      av_vel = simulation_steps(params, cells_even, cells_odd, obstacles);
+	      av_vel = simulation_steps(&params, cells_even, cells_odd, obstacles);
 	    }
 	    //this could be moved to end
 	    MPI_Reduce(&av_vel, &av_vels[ii], 1, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
@@ -324,7 +324,7 @@ int main(int argc, char* argv[])
 }
 
 void write_values(const char * final_state_file, const char * av_vels_file,
-    const param_t params, speed_t* cells, int* obstacles, float* av_vels)
+    const param_t params, speed_t* cells, const unsigned int* obstacles, float* av_vels)
 {
     FILE* fp;                     /* file pointer */
     int ii,jj,kk;                 /* generic counters */
