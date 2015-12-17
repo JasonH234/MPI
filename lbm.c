@@ -221,64 +221,137 @@ int main(int argc, char* argv[])
         tic=timstr.tv_sec+(timstr.tv_usec/1000000.0);
     }
 
+    speed_t** next_grid_ptr = &cells_odd;
+    speed_t** old_grid_ptr = &cells_even;
+
+    int n;            //counter
+    const float c_sq = 1.0f/3.0f;  /* square of speed of sound */
+    const float w0 = 4.0f/9.0f;    /* weighting factor */
+    const float w1 = 1.0f/9.0f;    /* weighting factor */
+    const float w2 = 1.0f/36.0f;   /* weighting factor */
+    const float omega_dif = 1.0f-params.omega;
+    float d_equ[NSPEEDS];        /* equilibrium densities */
+
     for (ii = 0; ii < params.max_iters; ii++)
     {
         float av_vel =0.0f;
-        if(ii % 2 == 0) {
 
-	      if(do_accel)
-	         accelerate_flow(params, accel_area, cells_even, obstacles);
-
-	      // only even send
-	      if(rank%2 == 0) {
-            MPI_Send(&cells_even[0], params.nx, MPI_SPEED_T, 
+          if(do_accel)
+            accelerate_flow(params, accel_area, *old_grid_ptr, obstacles);
+          
+          if(rank%2 == 0) {
+            MPI_Send(&(*old_grid_ptr)[0], params.nx, MPI_SPEED_T, 
 	             up, 0, MPI_COMM_WORLD);
-            MPI_Recv(&cells_even[pad2], params.nx, MPI_SPEED_T, up, 0, 
+            MPI_Recv(&(*old_grid_ptr)[pad2], params.nx, MPI_SPEED_T, up, 0, 
 	             MPI_COMM_WORLD, NULL);
-            MPI_Send(&cells_even[end], params.nx, MPI_SPEED_T, 
+            MPI_Send(&(*old_grid_ptr)[end], params.nx, MPI_SPEED_T, 
 	             down, 0, MPI_COMM_WORLD);
-            MPI_Recv(&cells_even[pad1], params.nx, MPI_SPEED_T, down, 0, 
+            MPI_Recv(&(*old_grid_ptr)[pad1], params.nx, MPI_SPEED_T, down, 0, 
 	             MPI_COMM_WORLD, NULL);
-	      }
-	      else {
-            MPI_Recv(&cells_even[pad1], params.nx, MPI_SPEED_T, down, 0, 
+          }
+          else {
+            MPI_Recv(&(*old_grid_ptr)[pad1], params.nx, MPI_SPEED_T, down, 0, 
 	             MPI_COMM_WORLD, NULL);
-	        MPI_Send(&cells_even[end], params.nx, MPI_SPEED_T, 
-		        down, 0, MPI_COMM_WORLD);
-	        MPI_Recv(&cells_even[pad2], params.nx, MPI_SPEED_T, up, 0, 
-		         MPI_COMM_WORLD, NULL);
-	        MPI_Send(&cells_even[0], params.nx, MPI_SPEED_T, 
-		         up, 0, MPI_COMM_WORLD);
-	      }
+            MPI_Send(&(*old_grid_ptr)[end], params.nx, MPI_SPEED_T, 
+	             down, 0, MPI_COMM_WORLD);
+            MPI_Recv(&(*old_grid_ptr)[pad2], params.nx, MPI_SPEED_T, up, 0, 
+	             MPI_COMM_WORLD, NULL);
+            MPI_Send(&(*old_grid_ptr)[0], params.nx, MPI_SPEED_T, 
+	             up, 0, MPI_COMM_WORLD);
+          }
 
-	      av_vel = simulation_steps(&params, cells_odd, cells_even, obstacles); 
-	    }
-	    else {
-	      if(do_accel)
-	        accelerate_flow(params, accel_area, cells_odd, obstacles);
-	      
-	      if(rank%2 == 0) {
-	        MPI_Send(&cells_odd[0], params.nx, MPI_SPEED_T, 
-		         up, 0, MPI_COMM_WORLD);
-	        MPI_Recv(&cells_odd[pad2], params.nx, MPI_SPEED_T, up, 0, 
-		         MPI_COMM_WORLD, NULL);
-	        MPI_Send(&cells_odd[end], params.nx, MPI_SPEED_T, 
-		         down, 0, MPI_COMM_WORLD);
-	        MPI_Recv(&cells_odd[pad1], params.nx, MPI_SPEED_T, down, 0, 
-		         MPI_COMM_WORLD, NULL);
-	      }
-	      else {
-	        MPI_Recv(&cells_odd[pad1], params.nx, MPI_SPEED_T, down, 0, 
-		         MPI_COMM_WORLD, NULL);
-	        MPI_Send(&cells_odd[end], params.nx, MPI_SPEED_T, 
-		         down, 0, MPI_COMM_WORLD);
-	        MPI_Recv(&cells_odd[pad2], params.nx, MPI_SPEED_T, up, 0, 
-		         MPI_COMM_WORLD, NULL);
-	        MPI_Send(&cells_odd[0], params.nx, MPI_SPEED_T, 
-		         up, 0, MPI_COMM_WORLD);
-	      }
-	      av_vel = simulation_steps(&params, cells_even, cells_odd, obstacles);
-	    }
+
+    
+
+    float tot_u = 0.0f;          
+    for (n = 0; n < params.ny*params.nx; n++)
+    {
+        float tmp[NSPEEDS];
+        const unsigned int y_s = (n < params.nx) ? n + params.nx*(params.ny+1) : n - params.nx;
+        const unsigned int y_n = n + params.nx;
+        const unsigned int x_e = (((n+1)%params.nx)==0) ? 1-params.nx : 1;            
+        const unsigned int x_w = ((n%params.nx)==0) ? params.nx-1 : -1;
+       // if(n == 0)printf("%d %d %d %d se %d sw %d ne %d nw %d \n", y_s, y_n,x_e,x_w, (y_s+x_e), (y_s+x_w), (y_n+x_e), (y_n+x_w));
+        tmp[0]  = (*old_grid_ptr)[n].speeds[0]; /* central cell, */                                                     /* no movement   */
+        tmp[1] = (*old_grid_ptr)[n+x_w].speeds[1]; /* east */
+        tmp[2]  = (*old_grid_ptr)[y_s].speeds[2]; /* north */
+        tmp[3] = (*old_grid_ptr)[n+x_e].speeds[3]; /* west */
+        tmp[4]  = (*old_grid_ptr)[y_n].speeds[4]; /* south */
+        tmp[5] = (*old_grid_ptr)[y_s + x_w].speeds[5]; 
+        tmp[6] = (*old_grid_ptr)[y_s + x_e].speeds[6]; 
+        tmp[7] = (*old_grid_ptr)[y_n + x_e].speeds[7]; 
+        tmp[8] = (*old_grid_ptr)[y_n + x_w].speeds[8];
+            
+        if (obstacles[n])
+          {
+	            (*next_grid_ptr)[n].speeds[1] = tmp[3];
+                (*next_grid_ptr)[n].speeds[2] = tmp[4];
+                (*next_grid_ptr)[n].speeds[3] = tmp[1];
+                (*next_grid_ptr)[n].speeds[4] = tmp[2];
+                (*next_grid_ptr)[n].speeds[5] = tmp[7];
+                (*next_grid_ptr)[n].speeds[6] = tmp[8];
+                (*next_grid_ptr)[n].speeds[7] = tmp[5];
+                (*next_grid_ptr)[n].speeds[8] = tmp[6];
+          } 
+        else {
+	    const float local_density = tmp[0] + tmp[1] + tmp[2] + tmp[3] + tmp[4] + tmp[5] + tmp[6] + tmp[7] + tmp[8];
+        const float local_inverse = 1.0f/local_density;
+        const float u_x = (tmp[1] +
+                tmp[5] +
+                tmp[8]
+            - (tmp[3] +
+                tmp[6] +
+                tmp[7]))
+            * local_inverse;
+
+        const float u_y = (tmp[2] +
+                tmp[5] +
+                tmp[6]
+            - (tmp[4] +
+                tmp[7] +
+                tmp[8]))
+            * local_inverse;
+
+        const float u_sq = u_x * u_x + u_y * u_y;
+	    const float c1 = params.omega*local_density *w1;
+	    const float c2 = params.omega* local_density * w2;
+	    const float u_sum = u_x + u_y;
+	    const float u_dif = u_x - u_y;
+	    const float d = 1.0f - u_sq*1.5f;
+
+        /*d_equ[0] = params.omega*w0 * local_density * d;
+        d_equ[1] = c1 * (d + 4.5*u_x*(2.0/3.0 + u_x));
+        d_equ[3] = c1 * (d - 4.5*u_x*(2.0/3.0 - u_x));
+        d_equ[2] = c1 * (d + 4.5*u_y*(2.0/3.0 + u_y)); 
+        d_equ[4] = c1 * (d - 4.5*u_y*(2.0/3.0 - u_y));
+        d_equ[5] = c2 * (d + 4.5*u_sum*(2.0/3.0 + u_sum));
+        d_equ[7] = c2 * (d - 4.5*u_sum*(2.0/3.0 - u_sum));
+        d_equ[8] = c2 * (d + 4.5*u_dif*(2.0/3.0 + u_dif));
+        d_equ[6] = c2 * (d - 4.5*u_dif*(2.0/3.0 - u_dif));*/
+             (*next_grid_ptr)[n].speeds[0] = (tmp[0]*omega_dif +params.omega*w0 * local_density * d);
+             (*next_grid_ptr)[n].speeds[1] = (tmp[1]*omega_dif +c1 * (d + 4.5f*u_x*(2.0f/3.0f + u_x)));
+             (*next_grid_ptr)[n].speeds[2] = (tmp[2]*omega_dif +c1 * (d + 4.5f*u_y*(2.0f/3.0f + u_y)));
+             (*next_grid_ptr)[n].speeds[3] = (tmp[3]*omega_dif +c1 * (d - 4.5f*u_x*(2.0f/3.0f - u_x)));
+             (*next_grid_ptr)[n].speeds[4] = (tmp[4]*omega_dif +c1 * (d - 4.5f*u_y*(2.0f/3.0f - u_y)));
+             (*next_grid_ptr)[n].speeds[5] = (tmp[5]*omega_dif +c2 * (d + 4.5f*u_sum*(2.0f/3.0f + u_sum)));
+             (*next_grid_ptr)[n].speeds[6] = (tmp[6]*omega_dif +c2 * (d - 4.5f*u_dif*(2.0f/3.0f - u_dif)));
+             (*next_grid_ptr)[n].speeds[7] = (tmp[7]*omega_dif +c2 * (d - 4.5f*u_sum*(2.0f/3.0f - u_sum)));
+             (*next_grid_ptr)[n].speeds[8] = (tmp[8]*omega_dif +c2 * (d + 4.5f*u_dif*(2.0f/3.0f + u_dif)));
+/*
+        for (kk = 0; kk < NSPEEDS; kk++)
+        {
+             //d_equ[kk] = 0.0f;
+             cells[ii*params.nx+jj].speeds[kk] = (tmp[kk]*omega_dif +d_equ[kk]);
+        }*/
+        tot_u += sqrt(u_sq);
+      }
+    }
+    av_vel = tot_u / (float) params.tot_cells; 
+
+
+          //av_vel = simulation_steps(&params, *next_grid_ptr, *old_grid_ptr, obstacles);
+          next_grid_ptr = (ii %2 == 0) ? &cells_odd : &cells_even;
+          old_grid_ptr = (ii %2 == 0) ? &cells_even : &cells_odd;
 	    //this could be moved to end
 	    MPI_Reduce(&av_vel, &av_vels[ii], 1, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
         //if(rank==0) printf("Av vel: %.12E\n", av_vels[ii]);

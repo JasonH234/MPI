@@ -106,13 +106,14 @@ float simulation_steps(const param_t *params, speed_t* cells, const speed_t* old
           } 
         else {
 	    const float local_density = tmp[0] + tmp[1] + tmp[2] + tmp[3] + tmp[4] + tmp[5] + tmp[6] + tmp[7] + tmp[8];
+        const float local_inverse = 1.0f/local_density;
         const float u_x = (tmp[1] +
                 tmp[5] +
                 tmp[8]
             - (tmp[3] +
                 tmp[6] +
                 tmp[7]))
-            / local_density;
+            * local_inverse;
 
         const float u_y = (tmp[2] +
                 tmp[5] +
@@ -120,11 +121,11 @@ float simulation_steps(const param_t *params, speed_t* cells, const speed_t* old
             - (tmp[4] +
                 tmp[7] +
                 tmp[8]))
-            / local_density;
+            * local_inverse;
 
         const float u_sq = u_x * u_x + u_y * u_y;
-	    const float c1 = params->omega*local_density / 9.0f;
-	    const float c2 = params->omega* local_density / 36.0f;
+	    const float c1 = params->omega*local_density *w1;
+	    const float c2 = params->omega* local_density * w2;
 	    const float u_sum = u_x + u_y;
 	    const float u_dif = u_x - u_y;
 	    const float d = 1.0f - u_sq*1.5f;
