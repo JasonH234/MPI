@@ -57,6 +57,7 @@
 #include <sys/resource.h>
 #include <stddef.h>
 #include "lbm.h"
+#include <omp.h>
 #include "mpi.h"
 
 /*
@@ -88,8 +89,13 @@ int main(int argc, char* argv[])
 
     int flag, size, rank, name_len;
     char processor_name[MPI_MAX_PROCESSOR_NAME];
-    MPI_Init(NULL, NULL);
+    //    MPI_Init(NULL, NULL);
+    int required = MPI_THREAD_FUNNELED;
+    int provided;
+    MPI_Init_thread(&argc, &argv, required, &provided);
+
     MPI_Initialized(&flag);
+
     if(flag == 0) {
       MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
     }
@@ -232,9 +238,18 @@ int main(int argc, char* argv[])
     const float omega_dif = 1.0f-params.omega;
     float d_equ[NSPEEDS];        /* equilibrium densities */
 
+
+    omp_set_dynamic(0);
+    omp_set_num_threads(16);
+        
+#pragma omp parallel
+    {
+      printf("%d, %d, %s\n", omp_get_thread_num(), omp_get_num_threads(), processor_name);
+    }
     for (ii = 0; ii < params.max_iters; ii++)
     {
         float av_vel =0.0f;
+
 
           if(do_accel)
             accelerate_flow(params, accel_area, *old_grid_ptr, obstacles);
@@ -264,6 +279,8 @@ int main(int argc, char* argv[])
     
 
     float tot_u = 0.0f;          
+
+#pragma omp parallel for reduction(+:tot_u) shared(params,cells_even, cells_odd, obstacles, old_grid_ptr, next_grid_ptr) private(n) default(none) schedule(auto) num_threads(8)
     for (n = 0; n < params.ny*params.nx; n++)
     {
         float tmp[NSPEEDS];

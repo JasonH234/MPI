@@ -4,7 +4,7 @@
 #PBS -joe
 #PBS -o LBM.out
 #PBS -q teaching
-#PBS -l nodes=1:ppn=16,walltime=00:02:00
+#PBS -l nodes=4:ppn=1,walltime=00:02:00
 
 #! Mail to user if job aborts
 #PBS -m a
@@ -30,5 +30,6 @@ echo PBS job ID is $PBS_JOBID
 echo This jobs runs on the following machines:
 cat $PBS_NODEFILE > machine.file.$PBS_JOBID
 
+
 numprocs=`wc $PBS_NODEFILE | awk '{ print $1 }'`
-mpirun -np $numprocs -machinefile machine.file.$PBS_JOBID $application $options 
+mpirun -np 4 -machinefile machine.file.$PBS_JOBID $application $options 

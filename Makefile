@@ -1,6 +1,6 @@
 CC=mpicc
 
-CFLAGS=-Ofast 
+CFLAGS=-Ofast -openmp  
 
 EXE=lbm
 
