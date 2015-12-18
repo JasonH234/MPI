@@ -33,18 +33,6 @@ plot:
 check:
 	python ../check/check.py --ref-av-vels-file=$(REF_AV_VELS_FILE) --ref-final-state-file=$(REF_FINAL_STATE_FILE) --av-vels-file=$(AV_VELS_FILE) --final-state-file=$(FINAL_STATE_FILE)
 
-rect:
-	python ../check/check.py --ref-av-vels-file=../check/rect.av_vels.dat --ref-final-state-file=../check/rect.final_state.dat --av-vels-file=$(AV_VELS_FILE) --final-state-file=$(FINAL_STATE_FILE)
-
-box:
-	python ../check/check.py --ref-av-vels-file=../check/box.av_vels.dat --ref-final-state-file=../check/box.final_state.dat --av-vels-file=$(AV_VELS_FILE) --final-state-file=$(FINAL_STATE_FILE)
-
-small:
-	python ../check/check.py --ref-av-vels-file=../check/small_pipe.av_vels.dat --ref-final-state-file=../check/small_pipe.final_state.dat --av-vels-file=$(AV_VELS_FILE) --final-state-file=$(FINAL_STATE_FILE)
-
-large:
-	python ../check/check.py --ref-av-vels-file=../check/large_pipe.av_vels.dat --ref-final-state-file=../check/large_pipe.final_state.dat --av-vels-file=$(AV_VELS_FILE) --final-state-file=$(FINAL_STATE_FILE)
-
 
 submission:
 	@if [ -e $(SUBMIT_DIR) ] ; \
