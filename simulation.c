@@ -65,7 +65,7 @@ void accelerate_flow(const param_t params, const accel_area_t accel_area,
 
 float simulation_steps(const param_t *params, speed_t* cells, const speed_t* old_cells, const unsigned int* obstacles)
 {
-  int ii,jj, kk, n;            /* generic counters */
+  int n;            /* generic counters */
     const float c_sq = 1.0f/3.0f;  /* square of speed of sound */
     const float w0 = 4.0f/9.0f;    /* weighting factor */
     const float w1 = 1.0f/9.0f;    /* weighting factor */
@@ -78,6 +78,8 @@ float simulation_steps(const param_t *params, speed_t* cells, const speed_t* old
     n = params->nx*params->ny;
     while (n--)
     {
+        if(obstacles[n]==2)
+            continue;
         float tmp[NSPEEDS];
         const unsigned int y_s = (n < params->nx) ? n + params->nx*(params->ny+1) : n - params->nx;
         const unsigned int y_n = n + params->nx;

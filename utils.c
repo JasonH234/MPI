@@ -291,7 +291,7 @@ void initialise(const char* param_file, accel_area_t * accel_area,
                     y_pos >= obstacles[kk].obs_y_min &&
                     y_pos <  obstacles[kk].obs_y_max)
                 {
-		  (*obstacles_ptr)[ii*params->nx + jj] = 1;		  
+		        (*obstacles_ptr)[ii*params->nx + jj] = 1;		  
                 }
             }
 	        // if cell is not an obstacle, increment total cell count and consider bounds
@@ -307,6 +307,22 @@ void initialise(const char* param_file, accel_area_t * accel_area,
                     maxY = ii;
 	        }
         }
+    }
+    for (ii = 0; ii < params->ny; ii++)
+    {
+        for (jj = 0; jj < params->nx; jj++)
+        {
+            if((*obstacles_ptr)[ii*params->nx +jj] == 1) {
+                const unsigned int y_n = (ii + 1) % params->ny;
+                const unsigned int x_e = (jj + 1) % params->nx;
+                const unsigned int y_s = (ii == 0) ? (ii + params->ny - 1) : (ii - 1);
+                const unsigned int x_w = (jj == 0) ? (jj + params->nx - 1) : (jj - 1);
+                if((*obstacles_ptr)[ii*params->nx + x_w] >= 1 && (*obstacles_ptr)[ii*params->nx + x_e] >= 1 && 
+                    (*obstacles_ptr)[y_n*params->nx+jj] >= 1 && (*obstacles_ptr)[y_s*params->nx +jj] >= 1 && 
+                    (*obstacles_ptr)[y_n*params->nx + x_e] >= 1 && (*obstacles_ptr)[y_s*params->nx+x_e] >= 1 && 
+                    (*obstacles_ptr)[y_n*params->nx + x_w] >= 1 && (*obstacles_ptr)[y_s*params->nx+x_w] >= 1)
+                        (*obstacles_ptr)[ii*params->nx +jj] =2;
+        }       }
     }
 
     params->minX = (minX -1 > 0) ? minX-2 : 0;
