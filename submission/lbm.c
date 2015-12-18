@@ -248,9 +248,8 @@ int main(int argc, char* argv[])
           next_grid_ptr = (ii %2 == 0) ? &cells_even : &cells_odd;
           old_grid_ptr = (ii %2 == 0) ? &cells_odd : &cells_even;
 
-	    //this could be moved to end
 	    MPI_Reduce(&av_vel, &av_vels[ii], 1, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
-        //if(rank==0) printf("Av vel: %.12E\n", av_vels[ii]);
+
             #ifdef DEBUG
             printf("==timestep: %d==\n", ii);
             printf("av velocity: %.12E\n", av_vels[ii]);
