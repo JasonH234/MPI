@@ -232,24 +232,17 @@ int main(int argc, char* argv[])
             accelerate_flow(params, accel_area, *old_grid_ptr, obstacles);
           
           if(rank%2 == 0) {
-            MPI_Send(&(*old_grid_ptr)[0], params.nx, MPI_SPEED_T, 
-	             up, 0, MPI_COMM_WORLD);
-            MPI_Recv(&(*old_grid_ptr)[pad2], params.nx, MPI_SPEED_T, up, 0, 
-	             MPI_COMM_WORLD, NULL);
-            MPI_Send(&(*old_grid_ptr)[end], params.nx, MPI_SPEED_T, 
-	             down, 0, MPI_COMM_WORLD);
-            MPI_Recv(&(*old_grid_ptr)[pad1], params.nx, MPI_SPEED_T, down, 0, 
-	             MPI_COMM_WORLD, NULL);
+            MPI_Sendrecv(&(*old_grid_ptr)[0], params.nx, MPI_SPEED_T, 
+	             up, 0, &(*old_grid_ptr)[pad2], params.nx, MPI_SPEED_T, up, 0, MPI_COMM_WORLD, NULL);
+            MPI_Sendrecv(&(*old_grid_ptr)[end], params.nx, MPI_SPEED_T, 
+	             down, 0, &(*old_grid_ptr)[pad1], params.nx, MPI_SPEED_T, down, 0, MPI_COMM_WORLD, NULL);
           }
           else {
-            MPI_Recv(&(*old_grid_ptr)[pad1], params.nx, MPI_SPEED_T, down, 0, 
-	             MPI_COMM_WORLD, NULL);
-            MPI_Send(&(*old_grid_ptr)[end], params.nx, MPI_SPEED_T, 
-	             down, 0, MPI_COMM_WORLD);
-            MPI_Recv(&(*old_grid_ptr)[pad2], params.nx, MPI_SPEED_T, up, 0, 
-	             MPI_COMM_WORLD, NULL);
-            MPI_Send(&(*old_grid_ptr)[0], params.nx, MPI_SPEED_T, 
-	             up, 0, MPI_COMM_WORLD);
+            MPI_Sendrecv(&(*old_grid_ptr)[end], params.nx, MPI_SPEED_T, down, 0, 
+	             &(*old_grid_ptr)[pad1], params.nx, MPI_SPEED_T, 
+	             down, 0, MPI_COMM_WORLD, NULL);
+            MPI_Sendrecv(&(*old_grid_ptr)[0], params.nx, MPI_SPEED_T, 
+	             up, 0, &(*old_grid_ptr)[pad2], params.nx, MPI_SPEED_T, up, 0, MPI_COMM_WORLD, NULL);
           }
           av_vel = simulation_steps(&params, *next_grid_ptr, *old_grid_ptr, obstacles);
           next_grid_ptr = (ii %2 == 0) ? &cells_even : &cells_odd;
