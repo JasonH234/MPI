@@ -74,8 +74,9 @@ float simulation_steps(const param_t *params, speed_t* cells, const speed_t* old
     
     float d_equ[NSPEEDS];        /* equilibrium densities */
     float tot_u = 0.0f;          /* accumulated magnitudes of velocity for each cell */
-
-    for (n = 0; n < params->ny*params->nx; n++)
+    
+    n = params->nx*params->ny;
+    while (n--)
     {
         float tmp[NSPEEDS];
         const unsigned int y_s = (n < params->nx) ? n + params->nx*(params->ny+1) : n - params->nx;
